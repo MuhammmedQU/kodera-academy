@@ -31,3 +31,7 @@
 - `ExerciseBlock` Tab (4 boşluq) və əl ilə Dayandır düyməsi ilə təkmilləşdirildi.
 - `PYTHON_RUNNER_HARNESS` real Python 3.12 ilə (`print`, `input`, `assertion_code`, xəta, stdout limiti) və `PythonWorkerRunner` sonsuz döngü `worker.terminate()` testi ilə təsdiqləndi (28/28 test).
 - Brauzerdə görünən test hallarının və CDN yükləməsinin məhdudiyyətləri sənədləşdirildi.
+
+## 2026-11-24 — Faza 8: İlk İki Python Modulunun Tədris Məzmunu
+- Sıfırdan başlayanlar üçün 2 pulsuz modul (8 dərs, 7 interaktiv məşq, 8 quiz) və idempotent `supabase/seeds/01_python_intro_modules.sql` (494 sətir) hazırlandı.
+- Bütün 7 məşqin həlləri real Python 3.12 harness-də 100% keçdi (8 fayl, 31/31 test).
