@@ -26,3 +26,8 @@
 - 11 kontent blokunu dəstəkləyən `LessonContentRenderer`, `CodeBlock` (Prism syntax highlighting + copy), `QuizBlock` (server-side qiymətləndirmə), `ExerciseBlock` və `RegistrationInvitationCard` yaradıldı.
 - Lazy-loaded Tələbə Paneli (`/dashboard`, kurslar, kurikulum, dərs oxuyucu, irəliləyiş, profil, hesab tənzimləmələri) tamamlandı.
 - `typecheck`, `lint`, `vitest` (22/22 test), `security:check`, `build` tam keçdi.
+
+## 2026-11-24 — Faza 7: İnteraktiv Python Öyrənmə Mühiti (Pyodide Web Worker)
+- `ExerciseBlock` Tab (4 boşluq) və əl ilə Dayandır düyməsi ilə təkmilləşdirildi.
+- `PYTHON_RUNNER_HARNESS` real Python 3.12 ilə (`print`, `input`, `assertion_code`, xəta, stdout limiti) və `PythonWorkerRunner` sonsuz döngü `worker.terminate()` testi ilə təsdiqləndi (28/28 test).
+- Brauzerdə görünən test hallarının və CDN yükləməsinin məhdudiyyətləri sənədləşdirildi.

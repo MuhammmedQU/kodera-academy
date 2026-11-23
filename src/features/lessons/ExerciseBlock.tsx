@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, Code2, Lightbulb, Play, RotateCcw } from 'lucide-react';
+import { useState, type KeyboardEvent } from 'react';
+import { ChevronDown, ChevronUp, Code2, Lightbulb, Play, RotateCcw, Square } from 'lucide-react';
 import type { ExerciseAttemptSummary, PublicExercise } from '@shared/types/domain';
 import {
   Alert,
@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui';
+import { resetSharedPythonRunner } from '@/features/python-runner/pythonRunner';
 
 export interface PythonRunOutcome {
   status: 'passed' | 'failed' | 'error' | 'timeout';
@@ -93,6 +94,33 @@ export function ExerciseBlock({
     }
   };
 
+  const handleEditorKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const next = `${code.slice(0, start)}    ${code.slice(end)}`;
+      setCode(next);
+      requestAnimationFrame(() => {
+        target.selectionStart = start + 4;
+        target.selectionEnd = start + 4;
+      });
+    }
+  };
+
+  const handleStop = () => {
+    resetSharedPythonRunner();
+    setRunning(false);
+    setOutcome({
+      status: 'timeout',
+      stdout: '',
+      stderr: 'İcra istifadəçi tərəfindən dayandırıldı.',
+      executionTimeMs: 0,
+      testResults: [],
+    });
+  };
+
   return (
     <Card className="border-zinc-300/90">
       <CardHeader className="rounded-t-2xl bg-zinc-900 text-white">
@@ -134,20 +162,34 @@ export function ExerciseBlock({
             id={`ex-editor-${exercise.id}`}
             value={code}
             onChange={(e) => setCode(e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             rows={7}
             spellCheck={false}
             aria-label={`${exercise.title} kod redaktoru`}
             className="w-full rounded-xl border border-zinc-800 bg-[#18181B] p-4 font-mono text-sm leading-relaxed text-zinc-100 focus:border-[#4338CA] focus:ring-2 focus:ring-[#4338CA]/30 focus:outline-none"
           />
+          <p className="mt-1 text-[11px] text-zinc-500">
+            Tab düyməsi 4 boşluq (indentation) əlavə edir. Kodunuz yalnız brauzerinizdə izolyasiya
+            olunmuş Web Worker-də icra olunur; ilk işə salmada Python mühiti bir neçə saniyə
+            yüklənə bilər.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {onRunPython && exercise.execution_mode === 'pyodide_worker' ? (
-              <Button variant="primary" isLoading={running} onClick={handleRun}>
-                <Play className="h-4 w-4" />
-                {running ? 'Python icra olunur...' : 'Kodu işə sal və yoxla'}
-              </Button>
+              <>
+                <Button variant="primary" isLoading={running} onClick={handleRun}>
+                  <Play className="h-4 w-4" />
+                  {running ? 'Python icra olunur...' : 'Kodu işə sal və yoxla'}
+                </Button>
+                {running && (
+                  <Button variant="danger" size="sm" onClick={handleStop}>
+                    <Square className="h-3.5 w-3.5" />
+                    Dayandır
+                  </Button>
+                )}
+              </>
             ) : (
               <Badge variant="neutral">
                 İnteraktiv brauzer icrası bu dil/mərhələ üçün aktiv deyil

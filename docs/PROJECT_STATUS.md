@@ -11,9 +11,9 @@
 | 3 | Layihə Təməli və Dizayn Sistemi | Tamamlandı | [03-phase-3-foundation-report.md](03-phase-3-foundation-report.md) |
 | 4 | Autentifikasiya və Qeydiyyat | Tamamlandı | [04-phase-4-auth-report.md](04-phase-4-auth-report.md) |
 | 5 | Admin Paneli | Tamamlandı | [05-phase-5-admin-dashboard-report.md](05-phase-5-admin-dashboard-report.md) |
-| 6 | Tələbə Paneli və LMS | **Tamamlandı** | [06-phase-6-student-lms-report.md](06-phase-6-student-lms-report.md) |
-| 7 | İnteraktiv Python Mühiti (Pyodide) | İcra olunur | — |
-| 8 | İlk İki Python Modulunun Məzmunu | Gözləyir | — |
+| 6 | Tələbə Paneli və LMS | Tamamlandı | [06-phase-6-student-lms-report.md](06-phase-6-student-lms-report.md) |
+| 7 | İnteraktiv Python Mühiti (Pyodide) | **Tamamlandı** | [07-phase-7-python-runner-report.md](07-phase-7-python-runner-report.md) |
+| 8 | İlk İki Python Modulunun Məzmunu | İcra olunur | — |
 | 9 | İctimai Vebsayt və Marketinq Təcrübəsi | Gözləyir | — |
 | 10 | Təhlükəsizlik və Keyfiyyət Auditi (QA) | Gözləyir | — |
 | 11 | Deployment Hazırlığı | Gözləyir | — |
