@@ -1,0 +1,36 @@
+# Kodera Academy — Supabase CLI Reference Configuration (No Secrets)
+project_id = "kodera-academy"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 500
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = [
+  "http://localhost:5173/login",
+  "http://localhost:5173/reset-password"
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+minimum_password_length = 8
+password_requirements = "letters_digits"
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"

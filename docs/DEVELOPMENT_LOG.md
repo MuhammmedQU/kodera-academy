@@ -45,3 +45,7 @@
 - `security-audit-extended.test.ts` (SQLi, Zod, Prod sandbox bloklama, 6 SQL miqrasiya & 23 cədvəl RLS statik audit) və `tests/e2e/kodera-e2e.spec.ts` (4 real Chrome Playwright axını) yazıldı.
 - `PublicLayout.tsx` əlçatanlıq (`<a><button>`), `dev-sandbox.mjs` `DEP0190` və `vitest@5.1.1` yenilənməsi (`npm audit` → **0 vulnerability**) tamamlandı.
 - 35/35 Vitest + 4/4 Chrome Playwright E2E + `typecheck` + `lint` + `security:check` + `build` tam keçdi.
+
+## 2026-11-24 — Faza 11: Production Deployment Hazırlığı
+- `vercel.json` (SPA rewrites + HSTS/CSP/security headers), `supabase/config.toml`, `.github/workflows/ci.yml` və `docs/11-deployment-guide-and-checklist.md` hazırlandı.
+- Xarici/geri dönməz əməliyyatlar (canlı deploy, domen, real email) sahibinin icazəsi üçün saxlanıldı.

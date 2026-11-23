@@ -1,7 +1,7 @@
 # Kodera Academy — Layihə Statusu (`PROJECT_STATUS.md`)
 
 > **Son yenilənmə:** 2026-11-24  
-> **Cari Mərhələ:** Faza 6 tamamlandı → Faza 7 icra olunur
+> **Cari Mərhələ:** Faza 0 – Faza 11 tamamlandı (Avtonom inkişaf mərhələsi yekunlaşdı; xarici Supabase / GitHub / Vercel qoşulması gözləyir)
 
 | Faza | Adı | Status | Hesabat |
 | :-: | :--- | :---: | :--- |
@@ -15,8 +15,8 @@
 | 7 | İnteraktiv Python Mühiti (Pyodide) | Tamamlandı | [07-phase-7-python-runner-report.md](07-phase-7-python-runner-report.md) |
 | 8 | İlk İki Python Modulunun Məzmunu | Tamamlandı | [08-phase-8-python-content-report.md](08-phase-8-python-content-report.md) |
 | 9 | İctimai Vebsayt və Marketinq Təcrübəsi | Tamamlandı | [09-phase-9-public-website-report.md](09-phase-9-public-website-report.md) |
-| 10 | Təhlükəsizlik və Keyfiyyət Auditi (QA) | **Tamamlandı** | [10-phase-10-qa-security-report.md](10-phase-10-qa-security-report.md) |
-| 11 | Deployment Hazırlığı | İcra olunur | — |
+| 10 | Təhlükəsizlik və Keyfiyyət Auditi (QA) | Tamamlandı | [10-phase-10-qa-security-report.md](10-phase-10-qa-security-report.md) |
+| 11 | Deployment Hazırlığı | **Tamamlandı** | [11-phase-11-deployment-prep-report.md](11-phase-11-deployment-prep-report.md), [11-deployment-guide-and-checklist.md](11-deployment-guide-and-checklist.md) |
 
 ## Aktiv Mühit Bloklayıcıları (Xarici Resurslar)
 - Real `kodera-dev` və `kodera-prod` Supabase layihə açarları hələ `.env.local`-a əlavə edilməyib (inkişaf lokal təhlükəsiz sandbox + avtomatlaşdırılmış testlərlə davam edir; canlı Supabase RLS yoxlaması açarlar əlavə olunduqda icra ediləcək).

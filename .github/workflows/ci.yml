@@ -1,0 +1,46 @@
+name: Kodera CI — Quality & Security Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Python 3.12 (for Python curriculum harness verification)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript strict typecheck
+        run: npm run typecheck
+
+      - name: ESLint check
+        run: npm run lint
+
+      - name: Static security scan (secret-leak & XSS)
+        run: npm run security:check
+
+      - name: Unit, integration, security & Python curriculum tests
+        run: npm run test
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev
+
+      - name: Production Vite build
+        run: npm run build
