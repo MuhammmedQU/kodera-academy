@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables & secrets (NEVER commit real secrets)
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Local platform caches & deployment artifacts
+.vercel/
+.supabase/
+
+# Test & coverage outputs
+coverage/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo

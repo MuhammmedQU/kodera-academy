@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-kodera-graphite: #18181b;
+  --color-kodera-brand: #4338ca;
+  --color-kodera-brand-hover: #3730a3;
+  --color-kodera-brand-soft: #eef2ff;
+  --color-kodera-amber: #f59e0b;
+  --color-kodera-amber-hover: #d97706;
+  --color-kodera-amber-soft: #fef3c7;
+  --color-kodera-canvas: #fafaf9;
+  --color-kodera-surface: #ffffff;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--color-kodera-canvas);
+    color: var(--color-kodera-graphite);
+    scroll-behavior: smooth;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  code,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-kodera-brand);
+    outline-offset: 2px;
+  }
+}
