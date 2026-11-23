@@ -11,3 +11,8 @@
 - `@vercel/node` (93 artıq paket və dev boşluqları) silindi, `zod@latest`-ə yüksəldildi → `npm audit --omit=dev` 0 vulnerability.
 - `typecheck`, `lint`, `vitest` (7/7), `security:check`, `build` tam keçdi.
 - Lokal Git repository (`main`) yaradıldı.
+
+## 2026-11-23 — Faza 4: Autentifikasiya, Qeydiyyat və Server API Təməli
+- 5 Vercel Serverless Function router (`api/`) + `SupabaseRepository` + dev-only `LocalSandboxRepository` + Zod/RBAC/RateLimit server qatı quruldu.
+- Qeydiyyat (`PENDING` + `KDR-YYYY-XXXXXX`), Giriş, Şifrə bərpası, Qorunan marşrutlar, `/application-status` və admin-tənzimlənən WhatsApp klik-to-chat düyməsi yaradıldı.
+- `typecheck`, `lint`, `vitest` (14/14 test, o cümlədən 6 təhlükəsizlik inteqrasiya testi), `security:check`, `build` tam keçdi.
