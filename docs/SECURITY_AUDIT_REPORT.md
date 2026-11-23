@@ -11,7 +11,7 @@
 
 Əvvəlki inkişaf hesabatlarına güvənmədən bütün kod bazası və SQL miqrasiyaları sıfırdan müstəqil audit edildi. Audit göstərdi ki, lokal sandbox testlərinin 100% keçməsinə baxmayaraq, **real Supabase PostgreSQL 15/16 + PostgREST v11+ + Vercel mühitində ciddi təhlükəsizlik boşluqları və kritik işləmə xətaları mövcud idi**.
 
-Bütün aşkarlanan kod, SQL, konfiqurasiya və başlıq boşluqları düzəldildi, yeni `supabase/migrations/202611230007_audit_security_hardening_and_indexes.sql` miqrasiyası əlavə olundu və avtomatlaşdırılmış təhlükəsizlik testləri genişləndirildi.
+Bütün aşkarlanan kod, SQL, konfiqurasiya və başlıq boşluqları düzəldildi, yeni `supabase/migrations/20261123000007_audit_security_hardening_and_indexes.sql` miqrasiyası əlavə olundu və avtomatlaşdırılmış təhlükəsizlik testləri genişləndirildi.
 
 ---
 

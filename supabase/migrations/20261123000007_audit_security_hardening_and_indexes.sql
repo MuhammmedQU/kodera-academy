@@ -518,34 +518,51 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-    -- Permit ONLY PostgreSQL FK ON DELETE SET NULL on actor_id when an admin account is deleted
-    IF TG_OP = 'UPDATE'
-       AND current_user IN ('postgres', 'supabase_admin', 'supabase_auth_admin', 'service_role')
-       AND OLD.actor_id IS NOT NULL
-       AND NEW.actor_id IS NULL
-       AND NEW.id IS NOT DISTINCT FROM OLD.id
-       AND NEW.actor_role IS NOT DISTINCT FROM OLD.actor_role
-       AND NEW.action IS NOT DISTINCT FROM OLD.action
-       AND NEW.entity_type IS NOT DISTINCT FROM OLD.entity_type
-       AND NEW.entity_id IS NOT DISTINCT FROM OLD.entity_id
-       AND NEW.metadata IS NOT DISTINCT FROM OLD.metadata
-       AND NEW.ip_address IS NOT DISTINCT FROM OLD.ip_address
-       AND NEW.user_agent IS NOT DISTINCT FROM OLD.user_agent
-       AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
-    THEN
-        RETURN NEW;
+    -- Permit ONLY PostgreSQL FK ON DELETE SET NULL on actor_id when an admin account is deleted.
+    -- Nested IF is required in PL/pgSQL so NEW is never bound during DELETE triggers.
+    IF TG_OP = 'UPDATE' THEN
+        IF current_user IN ('postgres', 'supabase_admin', 'supabase_auth_admin', 'service_role')
+           AND OLD.actor_id IS NOT NULL
+           AND NEW.actor_id IS NULL
+           AND NEW.id IS NOT DISTINCT FROM OLD.id
+           AND NEW.actor_role IS NOT DISTINCT FROM OLD.actor_role
+           AND NEW.action IS NOT DISTINCT FROM OLD.action
+           AND NEW.entity_type IS NOT DISTINCT FROM OLD.entity_type
+           AND NEW.entity_id IS NOT DISTINCT FROM OLD.entity_id
+           AND NEW.metadata IS NOT DISTINCT FROM OLD.metadata
+           AND NEW.ip_address IS NOT DISTINCT FROM OLD.ip_address
+           AND NEW.user_agent IS NOT DISTINCT FROM OLD.user_agent
+           AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
+        THEN
+            RETURN NEW;
+        END IF;
     END IF;
 
-    RAISE EXCEPTION 'Forbidden: audit_logs records are immutable and cannot be updated, deleted, or truncated'
+    RAISE EXCEPTION 'Forbidden: audit_logs records are immutable and cannot be updated or deleted'
         USING ERRCODE = '42501';
 END;
 $$;
+
+-- Dedicated statement-level trigger function (never references OLD/NEW) for BEFORE TRUNCATE
+CREATE OR REPLACE FUNCTION public.prevent_audit_log_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+    RAISE EXCEPTION 'Forbidden: audit_logs records are immutable and cannot be truncated'
+        USING ERRCODE = '42501';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.prevent_audit_log_mutation() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.prevent_audit_log_truncate() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS trg_audit_logs_no_truncate ON public.audit_logs;
 CREATE TRIGGER trg_audit_logs_no_truncate
     BEFORE TRUNCATE ON public.audit_logs
     FOR EACH STATEMENT
-    EXECUTE FUNCTION public.prevent_audit_log_mutation();
+    EXECUTE FUNCTION public.prevent_audit_log_truncate();
 
 -- ============================================================================
 -- 4. BOUND exercise_attempts.test_results JSONB SIZE + TIGHTEN TABLE GRANTS

@@ -15,7 +15,7 @@ Müstəqil audit nəticəsində aşkarlanan **bütün Kritik, Yüksək və əsas
 
 ### Niyə hələ `3. READY FOR PRODUCTION DEPLOYMENT` deyil?
 Dürüstlük və istehsal təhlükəsizliyi standartlarına əsasən, real xarici infrastruktur qoşulmadan icra edilməmiş **5 kritik canlı yoxlama** hələ tamamlanmayıb:
-1. `supabase/migrations/202611230001`–`0007` və `01_python_intro_modules.sql` fayllarının **canlı Supabase PostgreSQL 15/16** bazasında icrası;
+1. `supabase/migrations/20261123000001`–`000007` və `01_python_intro_modules.sql` fayllarının **canlı Supabase PostgreSQL 15/16** bazasında icrası;
 2. `VITE_SUPABASE_ANON_KEY` + real istifadəçi JWT-ləri ilə **canlı PostgREST RLS penetrasiya testi**;
 3. Real **Supabase Auth e-poçt təsdiqi və şifrə bərpa axınları** (o cümlədən `secure_password_change = true` yoxlaması);
 4. **Canlı Vercel Staging deployment** (`?__route=` API rewrite-ları, ESM runtime, soyuq başlanğıc, CSP/HSTS başlıqları);
@@ -36,7 +36,7 @@ Bu 5 addım Staging mühitində uğurla doğrulandıqdan sonra layihə `3. READY
 ## 3. Aşkarlanan və Həll Edilən Bütün Problemlərin Xülasəsi
 
 ### 3.1 Verilənlər Bazası, RLS və Miqrasiyalar
-Yeni `supabase/migrations/202611230007_audit_security_hardening_and_indexes.sql` miqrasiyası və `supabase/config.toml` yeniləməsi ilə düzəldildi:
+Yeni `supabase/migrations/20261123000007_audit_security_hardening_and_indexes.sql` miqrasiyası və `supabase/config.toml` yeniləməsi ilə düzəldildi:
 - **[KRİTİK]** `guard_profile_sensitive_columns()` PostgREST v11+ `request.jwt.claims` JSON-u və `service_role` / `supabase_auth_admin` rollarını tanıyır.
 - **[KRİTİK]** `check_and_record_rate_limit()` funksiyasından `PUBLIC`, `anon`, `authenticated` icazələri geri alındı (yalnız `service_role`), parametr sərhədləri və 24 saatlıq təmizləmə əlavə edildi.
 - **[KRİTİK]** `get_public_platform_settings()` və `get_course_curriculum_outline()` üçün `GRANT EXECUTE TO service_role` verildi; daxili/tələbə RPC-lərindən `PUBLIC`/`anon` icazələri geri alındı.

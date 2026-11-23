@@ -6,19 +6,21 @@
 
 ## 1. İki Ayrı Supabase Layihəsinin Yaradılması
 
-1. **Development layihəsi (`kodera-dev`):**
+1. **Development / Staging layihəsi (`kodera-dev`):**
+   - Tam staging quraşdırma və doğrulama siyahısı üçün əvvəlcə [STAGING_DEPLOYMENT_CHECKLIST.md](STAGING_DEPLOYMENT_CHECKLIST.md) sənədinə baxın.
    - Supabase Dashboard-da yeni layihə yaradın (məs., Avropa regionu — Frankfurt `eu-central-1`).
-   - **SQL Editor** (və ya `npx supabase link` + `npx supabase db push`) vasitəsilə miqrasiyaları **dəqiq bu ardıcıllıqla** icra edin:
-     1. `supabase/migrations/202611230001_extensions_enums_locales.sql`
-     2. `supabase/migrations/202611230002_identity_roles_applications.sql`
-     3. `supabase/migrations/202611230003_courses_modules_lessons_content.sql`
-     4. `supabase/migrations/202611230004_enrollments_progress_attempts.sql`
-     5. `supabase/migrations/202611230005_settings_audit_ratelimit.sql`
-     6. `supabase/migrations/202611230006_security_functions_rls_policies.sql`
+   - **SQL Editor** (və ya `npx supabase link` + `npx supabase db push`) vasitəsilə **7 miqrasiyanı dəqiq bu ardıcıllıqla** icra edin:
+     1. `supabase/migrations/20261123000001_extensions_enums_locales.sql`
+     2. `supabase/migrations/20261123000002_identity_roles_applications.sql`
+     3. `supabase/migrations/20261123000003_courses_modules_lessons_content.sql`
+     4. `supabase/migrations/20261123000004_enrollments_progress_attempts.sql`
+     5. `supabase/migrations/20261123000005_settings_audit_ratelimit.sql`
+     6. `supabase/migrations/20261123000006_security_functions_rls_policies.sql`
+     7. `supabase/migrations/20261123000007_audit_security_hardening_and_indexes.sql`
    - İlk 2 pulsuz Python modulunu yükləyin:
      - `supabase/seeds/01_python_intro_modules.sql`
 2. **Production layihəsi (`kodera-prod`):**
-   - Yalnız `kodera-dev`-də bütün canlı RLS və giriş axınlarını yoxladıqdan sonra eyni 6 miqrasiyanı və `01_python_intro_modules.sql` faylını `kodera-prod`-da icra edin.
+   - Yalnız `kodera-dev`-də [STAGING_DEPLOYMENT_CHECKLIST.md](STAGING_DEPLOYMENT_CHECKLIST.md) üzrə bütün canlı RLS, Auth, Vercel Preview və Pyodide testlərini yoxladıqdan sonra eyni **7 miqrasiyanı** və `01_python_intro_modules.sql` faylını `kodera-prod`-da icra edin.
 
 ---
 
@@ -100,7 +102,7 @@ END $$;
 
 ## 6. Canlıya Çıxış Öncəsi Yekun Yoxlama Siyahısı (Pre-Launch Checklist)
 
-- [ ] `kodera-dev`-də bütün 6 miqrasiya + `01_python_intro_modules.sql` xətasız icra olunub.
+- [ ] `kodera-dev`-də bütün 7 miqrasiya + `01_python_intro_modules.sql` xətasız icra olunub.
 - [ ] `kodera-dev`-də [02-security-test-plan.md](02-security-test-plan.md) sənədindəki canlı RLS yoxlamaları (`SEC-01` – `SEC-24`) təsdiqlənib.
 - [ ] Admin Panel (`/admin/settings`) vasitəsilə rəsmi **WhatsApp nömrəsi** və **əlaqə emaili** daxil edilib və sınaqdan keçirilib.
 - [ ] `vercel.json` təhlükəsizlik başlıqları (HSTS, CSP, X-Frame-Options, nosniff) canlı URL-də `curl -I` ilə təsdiqlənib.

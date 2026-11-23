@@ -1,7 +1,7 @@
 -- ============================================================================
 -- KODERA LMS — Initial Python Course & First Two Public Modules Seed
 -- Generated from server/content/initialSeed.ts (Module 1 & Module 2: 8 lessons)
--- Idempotent (ON CONFLICT DO NOTHING). Run AFTER migrations 0001-0006.
+-- Idempotent (ON CONFLICT DO NOTHING). Run AFTER migrations 0001-0007.
 -- ============================================================================
 
 BEGIN;

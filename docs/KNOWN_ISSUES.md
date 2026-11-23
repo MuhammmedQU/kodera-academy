@@ -31,7 +31,7 @@
 | ID | Əvvəlki Problem | Status | Həll |
 | :-: | :--- | :-: | :--- |
 | **AUD-01** | Vercel Vite layihəsində Next.js tipli `api/*/[...route].ts` marşrutları və ESM `.js` uzantılarının olmaması | **HƏLL EDİLDİ** | 5 düz funksiya (`api/{health,public,auth,student,admin}.ts`), `vercel.json` `?__route=` rewrite-ları və bütün server nisbi importlarında `.js` uzantıları |
-| **AUD-02** | `guard_profile_sensitive_columns()`, `get_public_platform_settings()`, `check_and_record_rate_limit()` və `search_path` SQL boşluqları | **HƏLL EDİLDİ** | `supabase/migrations/202611230007_audit_security_hardening_and_indexes.sql` |
+| **AUD-02** | `guard_profile_sensitive_columns()`, `get_public_platform_settings()`, `check_and_record_rate_limit()` və `search_path` SQL boşluqları | **HƏLL EDİLDİ** | `supabase/migrations/20261123000007_audit_security_hardening_and_indexes.sql` |
 | **AUD-03** | `SupabaseRepository.listStudents()` 3 qeyri-müəyyən FK səbəbindən PostgREST `PGRST201` çöküşü | **HƏLL EDİLDİ** | Açıq FK disambiguation (`!user_roles_user_id_fkey`, `!applications_user_id_fkey`, `!enrollments_student_id_fkey`) + real `completed_lessons_count` |
 | **AUD-04** | Tailwind CSS v4 sinif toqquşmaları (`cn()` `tailwind-merge` olmadan): görünməz hover düymələri və aşağı kontrast | **HƏLL EDİLDİ** | `tailwind-merge` quraşdırıldı (`src/lib/cn.ts`), `Button` `outlineLight` variantı əlavə edildi |
 | **AUD-05** | 54 ədəd etibarsız iç-içə `<Link><Button>` WCAG pozuntusu | **HƏLL EDİLDİ** | `<ButtonLink>` yaradıldı və bütün 22 faylda əvəzləndi (72 Chrome viewport yoxlamasında `a button` = 0) |

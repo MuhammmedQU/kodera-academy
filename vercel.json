@@ -45,7 +45,7 @@
       ]
     },
     {
-      "source": "/api/(auth|student|admin)",
+      "source": "/api/(health|auth|student|admin)",
       "headers": [
         { "key": "Cache-Control", "value": "no-store" },
         { "key": "X-Content-Type-Options", "value": "nosniff" }

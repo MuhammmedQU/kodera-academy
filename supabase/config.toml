@@ -1,5 +1,11 @@
-# Kodera Academy — Supabase CLI Reference Configuration (No Secrets)
-project_id = "kodera-academy"
+# Kodera Academy — Supabase CLI Configuration for kodera-dev (No Secrets)
+# For cloud staging (`kodera-dev`), also configure Site URL and exact Redirect URLs
+# in Supabase Dashboard -> Authentication -> URL Configuration:
+#   Site URL: https://<your-staging-preview-domain>.vercel.app
+#   Redirect URLs:
+#     https://<your-staging-preview-domain>.vercel.app/login
+#     https://<your-staging-preview-domain>.vercel.app/reset-password
+project_id = "kodera-dev"
 
 [api]
 enabled = true

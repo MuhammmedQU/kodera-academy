@@ -206,17 +206,20 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     const migDir = path.resolve(process.cwd(), 'supabase/migrations');
     const files = fs.readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
     expect(files).toEqual([
-      '202611230001_extensions_enums_locales.sql',
-      '202611230002_identity_roles_applications.sql',
-      '202611230003_courses_modules_lessons_content.sql',
-      '202611230004_enrollments_progress_attempts.sql',
-      '202611230005_settings_audit_ratelimit.sql',
-      '202611230006_security_functions_rls_policies.sql',
-      '202611230007_audit_security_hardening_and_indexes.sql',
+      '20261123000001_extensions_enums_locales.sql',
+      '20261123000002_identity_roles_applications.sql',
+      '20261123000003_courses_modules_lessons_content.sql',
+      '20261123000004_enrollments_progress_attempts.sql',
+      '20261123000005_settings_audit_ratelimit.sql',
+      '20261123000006_security_functions_rls_policies.sql',
+      '20261123000007_audit_security_hardening_and_indexes.sql',
     ]);
+    for (const file of files) {
+      expect(file).toMatch(/^\d{14}_[a-z0-9_]+\.sql$/);
+    }
 
     const rlsSql = fs.readFileSync(
-      path.join(migDir, '202611230006_security_functions_rls_policies.sql'),
+      path.join(migDir, '20261123000006_security_functions_rls_policies.sql'),
       'utf8',
     );
     const sensitiveTables = [
@@ -253,7 +256,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
 
     // Verify Migration 0007 fixes all critical DB audit findings
     const mig0007 = fs.readFileSync(
-      path.join(migDir, '202611230007_audit_security_hardening_and_indexes.sql'),
+      path.join(migDir, '20261123000007_audit_security_hardening_and_indexes.sql'),
       'utf8',
     );
     expect(mig0007).toContain("request.jwt.claims");
@@ -267,6 +270,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     expect(mig0007).toContain('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon, authenticated;');
     expect(mig0007).toContain('review_application_atomic');
     expect(mig0007).toContain('trg_audit_logs_no_truncate');
+    expect(mig0007).toContain('prevent_audit_log_truncate');
 
     // Verify supabase/config.toml configures [db.seed]
     const configToml = fs.readFileSync(path.resolve(process.cwd(), 'supabase/config.toml'), 'utf8');

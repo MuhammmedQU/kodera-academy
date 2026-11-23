@@ -45,7 +45,7 @@ Layihəni **`2. READY FOR STAGING TESTING`** mərhələsindən **`3. READY FOR P
 2. `.github/workflows/ci.yml` pipeline-ının yaşıl keçdiyini təsdiqləyin.
 
 ### Addım 2 — `kodera-dev` (Staging) Supabase Miqrasiya & Seed
-1. `kodera-dev` Supabase layihəsi yaradın (`supabase/migrations/202611230001`–`0007` ardıcıllıqla icra edin).
+1. `kodera-dev` Supabase layihəsi yaradın (`supabase/migrations/20261123000001`–`000007` ardıcıllıqla icra edin).
 2. `supabase/seeds/01_python_intro_modules.sql` faylını icra edin (idempotent).
 3. Supabase Auth > URL Configuration bölməsində `Site URL` və `Redirect URLs` (`/reset-password`, `/login`) dəyərlərini staging domenə uyğunlaşdırın.
 4. İlk admin hesabını yaradıb `public.user_roles` cədvəlində `role = 'admin'`, `public.profiles` cədvəlində `account_status = 'active'` təyin edin.
