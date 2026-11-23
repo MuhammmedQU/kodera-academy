@@ -21,3 +21,8 @@
 - 11 lazy-loaded Admin səhifəsi (Statistika, Müraciətlər + Daxili Qeydlər, Tələbələr, Kurs Təyinatları, Kurs/Modul/Dərs/11 Blok/Məşq/Quiz CMS, Platforma/WhatsApp Ayarları, Audit Jurnalı) yaradıldı.
 - Testlər nəticəsində Zod `.partial()` default xətası aşkarlandı və ayrıca `*PatchSchema` sxemləri ilə düzəldildi.
 - `typecheck`, `lint`, `vitest` (18/18 test), `security:check`, `build` tam keçdi.
+
+## 2026-11-24 — Faza 6: Tələbə Paneli və LMS
+- 11 kontent blokunu dəstəkləyən `LessonContentRenderer`, `CodeBlock` (Prism syntax highlighting + copy), `QuizBlock` (server-side qiymətləndirmə), `ExerciseBlock` və `RegistrationInvitationCard` yaradıldı.
+- Lazy-loaded Tələbə Paneli (`/dashboard`, kurslar, kurikulum, dərs oxuyucu, irəliləyiş, profil, hesab tənzimləmələri) tamamlandı.
+- `typecheck`, `lint`, `vitest` (22/22 test), `security:check`, `build` tam keçdi.

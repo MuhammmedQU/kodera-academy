@@ -9,9 +9,43 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { ApplicationStatusPage } from '@/features/auth/ApplicationStatusPage';
-import { RequireAdmin } from '@/features/auth/ProtectedRoute';
+import { RequireActiveStudent, RequireAdmin } from '@/features/auth/ProtectedRoute';
 
-// Lazy-loaded Admin routes (code-split away from public/student bundle)
+// Lazy-loaded Student Dashboard routes
+const StudentLayout = lazy(() =>
+  import('@/features/student/StudentLayout').then((m) => ({ default: m.StudentLayout })),
+);
+const StudentOverviewPage = lazy(() =>
+  import('@/features/student/StudentOverviewPage').then((m) => ({
+    default: m.StudentOverviewPage,
+  })),
+);
+const StudentCoursesPage = lazy(() =>
+  import('@/features/student/StudentCoursesPage').then((m) => ({ default: m.StudentCoursesPage })),
+);
+const StudentCourseCurriculumPage = lazy(() =>
+  import('@/features/student/StudentCourseCurriculumPage').then((m) => ({
+    default: m.StudentCourseCurriculumPage,
+  })),
+);
+const StudentLessonPage = lazy(() =>
+  import('@/features/student/StudentLessonPage').then((m) => ({ default: m.StudentLessonPage })),
+);
+const StudentProgressPage = lazy(() =>
+  import('@/features/student/StudentProgressPage').then((m) => ({
+    default: m.StudentProgressPage,
+  })),
+);
+const StudentProfilePage = lazy(() =>
+  import('@/features/student/StudentProfilePage').then((m) => ({ default: m.StudentProfilePage })),
+);
+const StudentSettingsPage = lazy(() =>
+  import('@/features/student/StudentSettingsPage').then((m) => ({
+    default: m.StudentSettingsPage,
+  })),
+);
+
+// Lazy-loaded Admin Dashboard routes
 const AdminLayout = lazy(() =>
   import('@/features/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })),
 );
@@ -68,6 +102,23 @@ export function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/application-status" element={<ApplicationStatusPage />} />
           <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        <Route
+          path="/dashboard"
+          element={
+            <RequireActiveStudent>
+              <StudentLayout />
+            </RequireActiveStudent>
+          }
+        >
+          <Route index element={<StudentOverviewPage />} />
+          <Route path="courses" element={<StudentCoursesPage />} />
+          <Route path="courses/:slug" element={<StudentCourseCurriculumPage />} />
+          <Route path="courses/:slug/lessons/:lessonSlug" element={<StudentLessonPage />} />
+          <Route path="progress" element={<StudentProgressPage />} />
+          <Route path="profile" element={<StudentProfilePage />} />
+          <Route path="settings" element={<StudentSettingsPage />} />
         </Route>
 
         <Route
