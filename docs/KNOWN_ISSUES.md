@@ -12,6 +12,6 @@
 ## 2. Texniki Qeydlər (Açıq)
 | ID | Məsələ | Prioritet | Plan |
 | :---: | :--- | :---: | :--- |
-| **TECH-01** | Production build əsas JS chunk ölçüsü 522 kB (React + Supabase + router bir chunk-da) | Aşağı | Faza 5–6-da `React.lazy` marşrut bölməsi və `manualChunks` tətbiq ediləcək |
+| **TECH-01** | ~~Production build əsas JS chunk ölçüsü 522 kB~~ | **HƏLL EDİLDİ** | Faza 9-da `React.lazy` + `vite.config.ts` `manualChunks` tətbiq edildi |
 | **TECH-02** | `devDependencies`-də `vitest` 3.x transitiv `@vitest/mocker` dev xəbərdarlığı (prod bundle-a daxil deyil) | Aşağı | Faza 10 QA auditində `vitest` yenilənməsi sınaqdan keçiriləcək |
 | **LIM-01** | Brauzerdə Pyodide icrası zamanı görünən test halları DevTools-da görünə bilər | Məhdudiyyət | Öyrənmə məşqləri üçün uyğundur; gələcəkdə imtahanlar üçün ayrıca izolyasiya olunmuş server sandbox əlavə oluna bilər |

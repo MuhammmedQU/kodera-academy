@@ -3,6 +3,12 @@ import { Route, Routes } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Spinner } from '@/components/ui';
 import { HomePage } from '@/features/public/HomePage';
+import { CoursesPage } from '@/features/public/CoursesPage';
+import { CourseDetailPage } from '@/features/public/CourseDetailPage';
+import { PublicLessonPage } from '@/features/public/PublicLessonPage';
+import { AboutPage } from '@/features/public/AboutPage';
+import { PrivacyPolicyPage } from '@/features/public/PrivacyPolicyPage';
+import { TermsOfServicePage } from '@/features/public/TermsOfServicePage';
 import { NotFoundPage } from '@/features/public/NotFoundPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
 import { LoginPage } from '@/features/auth/LoginPage';
@@ -96,6 +102,12 @@ export function App() {
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/courses/:slug" element={<CourseDetailPage />} />
+          <Route path="/courses/:slug/lessons/:lessonSlug" element={<PublicLessonPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

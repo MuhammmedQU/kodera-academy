@@ -35,3 +35,8 @@
 ## 2026-11-24 — Faza 8: İlk İki Python Modulunun Tədris Məzmunu
 - Sıfırdan başlayanlar üçün 2 pulsuz modul (8 dərs, 7 interaktiv məşq, 8 quiz) və idempotent `supabase/seeds/01_python_intro_modules.sql` (494 sətir) hazırlandı.
 - Bütün 7 məşqin həlləri real Python 3.12 harness-də 100% keçdi (8 fayl, 31/31 test).
+
+## 2026-11-24 — Faza 9: İctimai Vebsayt və Marketinq Təcrübəsi
+- Tam Ana Səhifə, Kurslar Kataloqu, Kurs Detalları, İctimai Dərs Oxuyucu (+ Modul 2 sonu Qeydiyyat Dəvəti), Haqqımızda, Məxfilik və İstifadə Şərtləri tamamlandı.
+- `vite.config.ts`-də `manualChunks` əlavə edildi (`TECH-01` həll olundu).
+- `typecheck`, `lint` (0 xəta, 0 xəbərdarlıq), `vitest` (31/31 test), `security:check`, `build` tam keçdi.
