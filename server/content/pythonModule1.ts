@@ -2,8 +2,8 @@ import type {
   AdminQuiz,
   LessonContentBlock,
   LessonItem,
-} from '../../src/shared/types/domain';
-import type { SeedExercise } from './initialSeed';
+} from '../../src/shared/types/domain.js';
+import type { SeedExercise } from './initialSeed.js';
 
 export interface ModuleContentBundle {
   lessons: LessonItem[];

@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, MailCheck, UserPlus } from 'lucide-react';
+import { CheckCircle2, MailCheck, RefreshCw, UserPlus } from 'lucide-react';
 import type { z } from 'zod';
 import { registerSchema, type RegisterInput } from '@shared/validation/schemas';
 import {
   Alert,
   Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -18,18 +19,28 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/app/AuthContext';
 import { usePlatformSettings } from '@/app/SettingsContext';
-import { ApiError } from '@/lib/apiClient';
+import { apiRequest, ApiError } from '@/lib/apiClient';
 
 export function RegisterPage() {
-  const { register: registerAccount } = useAuth();
+  const { user, isLoading, register: registerAccount } = useAuth();
   const { settings } = usePlatformSettings();
   const navigate = useNavigate();
 
   const [serverError, setServerError] = useState<string | null>(null);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const [verificationState, setVerificationState] = useState<{
     email: string;
     referenceCode?: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+    if (user.isAdmin) navigate('/admin', { replace: true });
+    else if (user.isActiveStudent) navigate('/dashboard', { replace: true });
+    else navigate('/application-status', { replace: true });
+  }, [user, isLoading, navigate]);
 
   const {
     register,
@@ -59,13 +70,34 @@ export function RegisterPage() {
       }
       navigate('/application-status', { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) {
-        setServerError(err.message);
-      } else if (err instanceof Error) {
+      if (err instanceof ApiError || err instanceof Error) {
         setServerError(err.message);
       } else {
         setServerError('Qeydiyyat zamanı gözlənilməz xəta baş verdi.');
       }
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!verificationState) return;
+    setResending(true);
+    setResendMessage(null);
+    setResendError(null);
+    try {
+      const res = await apiRequest<{ message: string }>('/api/auth/resend-verification', {
+        method: 'POST',
+        body: { email: verificationState.email },
+        auth: false,
+      });
+      setResendMessage(res.message);
+    } catch (err) {
+      setResendError(
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : 'Təsdiq linki yenidən göndərilmədi.',
+      );
+    } finally {
+      setResending(false);
     }
   };
 
@@ -74,7 +106,7 @@ export function RegisterPage() {
       <div className="mx-auto max-w-lg px-4 py-16">
         <Card>
           <CardHeader>
-            <CardTitle>Qeydiyyat müvəqqəti bağlıdır</CardTitle>
+            <CardTitle as="h1">Qeydiyyat müvəqqəti bağlıdır</CardTitle>
             <CardDescription>
               Hal-hazırda yeni tələbə qəbulu dayandırılıb. Pulsuz giriş dərslərini oxumağa davam edə
               və ya bizimlə əlaqə saxlaya bilərsiniz.
@@ -84,11 +116,9 @@ export function RegisterPage() {
             {settings.alternative_contact_text && (
               <Alert variant="info">{settings.alternative_contact_text}</Alert>
             )}
-            <Link to="/courses">
-              <Button variant="primary" className="w-full">
-                Pulsuz dərslərə bax
-              </Button>
-            </Link>
+            <ButtonLink to="/courses" variant="primary" className="w-full">
+              Pulsuz dərslərə bax
+            </ButtonLink>
           </CardContent>
         </Card>
       </div>
@@ -103,7 +133,7 @@ export function RegisterPage() {
             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
               <MailCheck className="h-6 w-6" />
             </div>
-            <CardTitle>Email ünvanınızı təsdiqləyin</CardTitle>
+            <CardTitle as="h1">Email ünvanınızı təsdiqləyin</CardTitle>
             <CardDescription>
               Qeydiyyat müraciətiniz <strong>PENDING (Gözləmədə)</strong> statusu ilə yaradıldı.
             </CardDescription>
@@ -122,11 +152,22 @@ export function RegisterPage() {
                 </p>
               </div>
             )}
-            <Link to="/login">
-              <Button variant="primary" className="w-full">
+            {resendMessage && <Alert variant="info">{resendMessage}</Alert>}
+            {resendError && <Alert variant="error">{resendError}</Alert>}
+            <div className="flex flex-col gap-2.5">
+              <ButtonLink to="/login" variant="primary" className="w-full">
                 Giriş səhifəsinə keç
+              </ButtonLink>
+              <Button
+                variant="outline"
+                className="w-full"
+                isLoading={resending}
+                onClick={handleResendVerification}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Təsdiq emailini yenidən göndər
               </Button>
-            </Link>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -147,7 +188,7 @@ export function RegisterPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h2" className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-[#4338CA]" />
             Tələbə məlumatları
           </CardTitle>

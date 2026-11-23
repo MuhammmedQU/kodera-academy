@@ -27,6 +27,7 @@ export function AdminSettingsPage() {
   const [form, setForm] = useState({
     academy_name: 'Kodera',
     academy_tagline: '',
+    logo_storage_path: null as string | null,
     contact_email: '',
     whatsapp_phone: '',
     whatsapp_button_enabled: false,
@@ -38,11 +39,13 @@ export function AdminSettingsPage() {
   });
 
   useEffect(() => {
-    apiRequest<AdminPlatformSettings>('/api/admin/settings')
+    const controller = new AbortController();
+    apiRequest<AdminPlatformSettings>('/api/admin/settings', { signal: controller.signal })
       .then((data) => {
         setForm({
           academy_name: data.academy_name,
           academy_tagline: data.academy_tagline,
+          logo_storage_path: data.logo_storage_path ?? null,
           contact_email: data.contact_email ?? '',
           whatsapp_phone: data.raw_whatsapp_phone ?? '',
           whatsapp_button_enabled: data.raw_whatsapp_button_enabled,
@@ -54,9 +57,13 @@ export function AdminSettingsPage() {
         });
       })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         setError(err instanceof ApiError ? err.message : 'Tənzimləmələr yüklənmədi.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -70,7 +77,7 @@ export function AdminSettingsPage() {
         body: {
           academy_name: form.academy_name,
           academy_tagline: form.academy_tagline,
-          logo_storage_path: null,
+          logo_storage_path: form.logo_storage_path || null,
           contact_email: form.contact_email || null,
           whatsapp_phone: form.whatsapp_phone || null,
           whatsapp_button_enabled: form.whatsapp_button_enabled,
@@ -124,7 +131,7 @@ export function AdminSettingsPage() {
       <form onSubmit={handleSave} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Akademiya və Qeydiyyat Ayarları</CardTitle>
+            <CardTitle as="h2">Akademiya və Qeydiyyat Ayarları</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -153,7 +160,7 @@ export function AdminSettingsPage() {
                 type="number"
                 min={0}
                 max={20}
-                hint="Hər kursun modul səviyyəsində is_public dəyəri ayrıca idarə olunur."
+                hint="Hər kursun modul səviyyəsində ictimai giriş ayrıca idarə olunur."
                 value={form.default_public_modules_count}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, default_public_modules_count: Number(e.target.value) }))
@@ -176,7 +183,7 @@ export function AdminSettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle as="h2" className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-emerald-600" />
               WhatsApp Administrator Əlaqə Düyməsi
             </CardTitle>
@@ -230,6 +237,13 @@ export function AdminSettingsPage() {
               value={form.alternative_contact_text}
               onChange={(e) => setForm((p) => ({ ...p, alternative_contact_text: e.target.value }))}
             />
+
+            {form.whatsapp_button_enabled && !waPreview && (
+              <Alert variant="warning" title="WhatsApp düyməsi hələ göstərilməyəcək">
+                Düymənin ictimai tərəfdə görünməsi üçün düzgün beynəlxalq nömrə (məs.,{' '}
+                <code>994501234567</code>) daxil edilməlidir.
+              </Alert>
+            )}
 
             {waPreview && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-950">

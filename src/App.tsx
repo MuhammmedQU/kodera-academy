@@ -131,6 +131,7 @@ export function App() {
           <Route path="progress" element={<StudentProgressPage />} />
           <Route path="profile" element={<StudentProfilePage />} />
           <Route path="settings" element={<StudentSettingsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
 
         <Route
@@ -151,6 +152,7 @@ export function App() {
           <Route path="lessons/:lessonId/editor" element={<AdminLessonEditorPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </Suspense>

@@ -9,7 +9,7 @@ export function PrivacyPolicyPage() {
       <h1 className="font-display text-3xl font-extrabold text-[#18181B]">Məxfilik Siyasəti</h1>
       <Card>
         <CardHeader>
-          <CardTitle>{settings.academy_name} — Şəxsi Məlumatların Qorunması</CardTitle>
+          <CardTitle as="h2">{settings.academy_name} — Şəxsi Məlumatların Qorunması</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm leading-relaxed text-zinc-700">
           <p>

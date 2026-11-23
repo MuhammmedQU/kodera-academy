@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http';
-import { resolveOptionalUser } from '../lib/auth';
-import { HttpError, sendJson, type ApiRequest } from '../lib/http';
-import type { KoderaRepository } from '../lib/repository';
+import { resolveOptionalUser } from '../lib/auth.js';
+import { HttpError, sendJson, type ApiRequest } from '../lib/http.js';
+import type { KoderaRepository } from '../lib/repository.js';
 
 export async function handlePublicRoute(
   req: ApiRequest,
@@ -31,6 +31,10 @@ export async function handlePublicRoute(
   // GET /api/public/courses/:slug/lessons/:lessonSlug
   const lessonMatch = subPath.match(/^courses\/([a-z0-9-]+)\/lessons\/([a-z0-9-]+)$/);
   if (lessonMatch) {
+    const allowed = await repo.checkRateLimit(`public_lesson:ip:${req.ip}`, 'public_lesson', 60, 90);
+    if (!allowed) {
+      throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Çox tez-tez sorğu göndərirsiniz. Bir az sonra cəhd edin.');
+    }
     const [, courseSlug, lessonSlug] = lessonMatch;
     const viewer = await resolveOptionalUser(req, repo);
     const result = await repo.getLessonView(courseSlug!, lessonSlug!, viewer);

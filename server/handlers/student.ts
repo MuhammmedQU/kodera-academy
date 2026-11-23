@@ -4,10 +4,15 @@ import {
   lessonProgressUpdateSchema,
   profileUpdateSchema,
   quizSubmitSchema,
-} from '../../src/shared/validation/schemas';
-import { requireActiveStudent, requireAuthenticated } from '../lib/auth';
-import { HttpError, sendJson, type ApiRequest } from '../lib/http';
-import type { KoderaRepository } from '../lib/repository';
+} from '../../src/shared/validation/schemas.js';
+import { requireActiveStudent, requireAuthenticated } from '../lib/auth.js';
+import { HttpError, sendJson, type ApiRequest } from '../lib/http.js';
+import type { KoderaRepository } from '../lib/repository.js';
+
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const LESSON_PROGRESS_RE = new RegExp(`^lessons/(${UUID_PATTERN})/progress$`, 'i');
+const EXERCISE_ATTEMPT_RE = new RegExp(`^exercises/(${UUID_PATTERN})/attempts$`, 'i');
+const QUIZ_SUBMIT_RE = new RegExp(`^quizzes/(${UUID_PATTERN})/submit$`, 'i');
 
 export async function handleStudentRoute(
   req: ApiRequest,
@@ -16,11 +21,19 @@ export async function handleStudentRoute(
 ): Promise<void> {
   const subPath = req.pathname.replace(/^\/api\/student\/?/, '').replace(/\/$/, '');
 
-  // PATCH /api/student/profile — authenticated non-archived user may update safe personal fields only
+  // PATCH /api/student/profile — strictly ACTIVE users only, rate-limited
   if (req.method === 'PATCH' && subPath === 'profile') {
     const { user } = await requireAuthenticated(req, repo);
-    if (user.profile.account_status === 'archived') {
-      throw new HttpError(403, 'ACCOUNT_ARCHIVED', 'Arxivlənmiş profil redaktə edilə bilməz.');
+    if (user.profile.account_status !== 'active') {
+      throw new HttpError(
+        403,
+        'ACCOUNT_NOT_ACTIVE',
+        'Profil məlumatları yalnız aktiv hesablar tərəfindən yenilənə bilər.',
+      );
+    }
+    const allowed = await repo.checkRateLimit(`profile:${user.profile.id}`, 'profile_update', 60, 20);
+    if (!allowed) {
+      throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Çox tez-tez profil yeniləmə sorğusu göndərirsiniz.');
     }
     const input = profileUpdateSchema.parse(req.body);
     const updated = await repo.updateOwnProfile(user.profile.id, input);
@@ -76,8 +89,12 @@ export async function handleStudentRoute(
   }
 
   // PUT /api/student/lessons/:lessonId/progress
-  const progMatch = subPath.match(/^lessons\/([0-9a-f-]+)\/progress$/i);
+  const progMatch = subPath.match(LESSON_PROGRESS_RE);
   if (req.method === 'PUT' && progMatch) {
+    const allowed = await repo.checkRateLimit(`progress:${user.profile.id}`, 'lesson_progress', 60, 60);
+    if (!allowed) {
+      throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Çox tez-tez irəliləyiş sorğusu göndərirsiniz.');
+    }
     const input = lessonProgressUpdateSchema.parse(req.body);
     const record = await repo.upsertLessonProgress(user.profile.id, progMatch[1]!, input);
     sendJson(res, 200, record);
@@ -85,7 +102,7 @@ export async function handleStudentRoute(
   }
 
   // POST /api/student/exercises/:exerciseId/attempts
-  const exMatch = subPath.match(/^exercises\/([0-9a-f-]+)\/attempts$/i);
+  const exMatch = subPath.match(EXERCISE_ATTEMPT_RE);
   if (req.method === 'POST' && exMatch) {
     const allowed = await repo.checkRateLimit(
       `exercise:${user.profile.id}`,
@@ -103,7 +120,7 @@ export async function handleStudentRoute(
   }
 
   // POST /api/student/quizzes/:quizId/submit
-  const quizMatch = subPath.match(/^quizzes\/([0-9a-f-]+)\/submit$/i);
+  const quizMatch = subPath.match(QUIZ_SUBMIT_RE);
   if (req.method === 'POST' && quizMatch) {
     const allowed = await repo.checkRateLimit(`quiz:${user.profile.id}`, 'quiz_submit', 60, 20);
     if (!allowed) {

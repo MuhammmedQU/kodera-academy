@@ -14,6 +14,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   const autoId = useId();
   const inputId = id ?? autoId;
   const errorId = `${inputId}-error`;
+  const hintId = `${inputId}-hint`;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -27,7 +28,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         ref={ref}
         id={inputId}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={error ? errorId : hint ? hintId : undefined}
         className={cn(
           'h-11 w-full rounded-xl border bg-white px-3.5 text-sm text-[#18181B] transition-colors focus:border-[#4338CA] focus:ring-2 focus:ring-[#4338CA]/15 focus:outline-none disabled:cursor-not-allowed disabled:bg-zinc-100',
           error ? 'border-red-500' : 'border-zinc-300',
@@ -42,7 +43,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           {error}
         </p>
       )}
-      {!error && hint && <p className="text-xs text-zinc-500">{hint}</p>}
+      {!error && hint && (
+        <p id={hintId} className="text-xs text-zinc-500">
+          {hint}
+        </p>
+      )}
     </div>
   );
 });

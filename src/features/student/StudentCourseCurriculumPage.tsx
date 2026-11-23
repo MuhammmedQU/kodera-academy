@@ -5,7 +5,7 @@ import type { Course, CurriculumOutlineModule } from '@shared/types/domain';
 import {
   Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -29,12 +29,22 @@ export function StudentCourseCurriculumPage() {
 
   useEffect(() => {
     if (!slug) return;
-    apiRequest<CourseDetailPayload>(`/api/student/courses/${slug}`)
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    setData(null);
+    apiRequest<CourseDetailPayload>(`/api/student/courses/${encodeURIComponent(slug)}`, {
+      signal: controller.signal,
+    })
       .then(setData)
-      .catch((err) =>
-        setError(err instanceof ApiError ? err.message : 'Bu kursa giriş icazəniz yoxdur.'),
-      )
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Bu kursa giriş icazəniz yoxdur.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [slug]);
 
   if (loading) return <Spinner label="Kurs kurikulumu yüklənir..." />;
@@ -44,12 +54,10 @@ export function StudentCourseCurriculumPage() {
         <Alert variant="error" title="Giriş məhdudiyyəti">
           {error || 'Kurs tapılmadı.'}
         </Alert>
-        <Link to="/dashboard/courses">
-          <Button variant="outline">
-            <ArrowLeft className="h-4 w-4" />
-            Mənim kurslarıma qayıt
-          </Button>
-        </Link>
+        <ButtonLink to="/dashboard/courses" variant="outline">
+          <ArrowLeft className="h-4 w-4" />
+          Mənim kurslarıma qayıt
+        </ButtonLink>
       </div>
     );
   }
@@ -82,7 +90,14 @@ export function StudentCourseCurriculumPage() {
               {completedCount} / {allLessons.length} dərs ({percent}%)
             </span>
           </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div
+            role="progressbar"
+            aria-valuenow={percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${data.course.title} üzrə irəliləyiş`}
+            className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100"
+          >
             <div className="h-full rounded-full bg-[#4338CA]" style={{ width: `${percent}%` }} />
           </div>
         </CardContent>
@@ -93,7 +108,7 @@ export function StudentCourseCurriculumPage() {
           <Card key={mod.id}>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle>{mod.title}</CardTitle>
+                <CardTitle as="h2">{mod.title}</CardTitle>
                 <Badge variant={mod.is_public ? 'amber' : 'brand'}>
                   {mod.is_public ? 'Giriş modulu' : 'Əsas modul'}
                 </Badge>
@@ -108,13 +123,13 @@ export function StudentCourseCurriculumPage() {
                     key={lesson.id}
                     className="flex flex-wrap items-center justify-between gap-3 py-3.5"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       {isDone ? (
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
                       ) : (
                         <Circle className="h-5 w-5 shrink-0 text-zinc-300" />
                       )}
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold text-[#18181B]">{lesson.title}</p>
                         <p className="flex items-center gap-1 text-xs text-zinc-500">
                           <Clock className="h-3 w-3" />
@@ -124,12 +139,14 @@ export function StudentCourseCurriculumPage() {
                     </div>
 
                     {lesson.slug && (
-                      <Link to={`/dashboard/courses/${data.course.slug}/lessons/${lesson.slug}`}>
-                        <Button variant={isDone ? 'outline' : 'primary'} size="sm">
-                          <PlayCircle className="h-4 w-4" />
-                          {isDone ? 'Təkrar bax' : 'Dərsi aç'}
-                        </Button>
-                      </Link>
+                      <ButtonLink
+                        to={`/dashboard/courses/${data.course.slug}/lessons/${lesson.slug}`}
+                        variant={isDone ? 'outline' : 'primary'}
+                        size="sm"
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        {isDone ? 'Təkrar bax' : 'Dərsi aç'}
+                      </ButtonLink>
                     )}
                   </div>
                 );

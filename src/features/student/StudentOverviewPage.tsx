@@ -5,7 +5,7 @@ import type { StudentCourseWithProgress } from '@shared/types/domain';
 import {
   Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -24,10 +24,17 @@ export function StudentOverviewPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiRequest<StudentCourseWithProgress[]>('/api/student/courses')
+    const controller = new AbortController();
+    apiRequest<StudentCourseWithProgress[]>('/api/student/courses', { signal: controller.signal })
       .then(setCourses)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   if (loading) return <Spinner label="Tələbə paneliniz hazırlanır..." />;
@@ -102,14 +109,13 @@ export function StudentOverviewPage() {
                 Növbəti dərs: <strong>{resumeCourse.next_lesson_title}</strong>
               </p>
             </div>
-            <Link
+            <ButtonLink
               to={`/dashboard/courses/${resumeCourse.course.slug}/lessons/${resumeCourse.next_lesson_slug}`}
+              variant="primary"
             >
-              <Button variant="primary">
-                <PlayCircle className="h-4 w-4" />
-                Dərsə davam et
-              </Button>
-            </Link>
+              <PlayCircle className="h-4 w-4" />
+              Dərsə davam et
+            </ButtonLink>
           </CardContent>
         </Card>
       )}
@@ -120,9 +126,9 @@ export function StudentOverviewPage() {
           title="Hələ hesabınıza kurs təyin olunmayıb"
           description="Hesabınız təsdiqlənib və aktivdir. Administrator sizə kurs təyin etdikdə kurslarınız burada görünəcək. Bu müddətdə ictimai pulsuz dərsləri oxuya bilərsiniz."
           action={
-            <Link to="/courses">
-              <Button variant="outline">İctimai kurslara bax</Button>
-            </Link>
+            <ButtonLink to="/courses" variant="outline">
+              İctimai kurslara bax
+            </ButtonLink>
           }
         />
       ) : (
@@ -154,27 +160,32 @@ export function StudentOverviewPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    role="progressbar"
+                    aria-valuenow={item.progress_percent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${item.course.title} irəliləyişi`}
+                    className="h-2 w-full overflow-hidden rounded-full bg-zinc-100"
+                  >
                     <div
                       className="h-full rounded-full bg-[#4338CA] transition-all"
                       style={{ width: `${item.progress_percent}%` }}
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Link to={`/dashboard/courses/${item.course.slug}`}>
-                      <Button variant="outline" size="sm">
-                        Kurikulum
-                      </Button>
-                    </Link>
+                    <ButtonLink to={`/dashboard/courses/${item.course.slug}`} variant="outline" size="sm">
+                      Kurikulum
+                    </ButtonLink>
                     {item.next_lesson_slug && (
-                      <Link
+                      <ButtonLink
                         to={`/dashboard/courses/${item.course.slug}/lessons/${item.next_lesson_slug}`}
+                        variant="primary"
+                        size="sm"
                       >
-                        <Button variant="primary" size="sm">
-                          Davam et
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </Link>
+                        Davam et
+                        <ArrowRight className="h-4 w-4" />
+                      </ButtonLink>
                     )}
                   </div>
                 </CardContent>

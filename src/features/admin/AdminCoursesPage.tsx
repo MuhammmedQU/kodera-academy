@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Archive, BookOpen, Eye, EyeOff, FolderKanban, Plus } from 'lucide-react';
+import { Archive, BookOpen, Edit3, Eye, EyeOff, FolderKanban, Plus } from 'lucide-react';
 import type { ContentStatus, Course, CourseDifficulty } from '@shared/types/domain';
 import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   CardContent,
   EmptyState,
@@ -16,7 +16,25 @@ import {
   Textarea,
 } from '@/components/ui';
 import { apiRequest, ApiError } from '@/lib/apiClient';
-import { formatContentStatusAz, formatDifficultyAz, formatDurationAz } from '@/lib/formatters';
+import {
+  formatContentStatusAz,
+  formatDifficultyAz,
+  formatDurationAz,
+  slugifyAz,
+} from '@/lib/formatters';
+
+const EMPTY_COURSE_FORM = {
+  title: '',
+  slug: '',
+  subtitle: '',
+  description: '',
+  target_audience: '',
+  programming_language: 'python',
+  difficulty: 'beginner' as CourseDifficulty,
+  estimated_duration_minutes: 300,
+  objectivesText: '',
+  status: 'draft' as ContentStatus,
+};
 
 export function AdminCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -24,19 +42,12 @@ export function AdminCoursesPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [slugTouched, setSlugTouched] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [form, setForm] = useState({
-    title: '',
-    slug: '',
-    subtitle: '',
-    description: '',
-    programming_language: 'python',
-    difficulty: 'beginner' as CourseDifficulty,
-    estimated_duration_minutes: 300,
-    objectivesText: '',
-    status: 'draft' as ContentStatus,
-  });
+  const [form, setForm] = useState(EMPTY_COURSE_FORM);
 
   const loadCourses = useCallback(async () => {
     setLoading(true);
@@ -55,48 +66,88 @@ export function AdminCoursesPage() {
     void loadCourses();
   }, [loadCourses]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreateModal = () => {
+    setEditingCourse(null);
+    setForm(EMPTY_COURSE_FORM);
+    setSlugTouched(false);
+    setModalError(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (course: Course) => {
+    setEditingCourse(course);
+    setForm({
+      title: course.title,
+      slug: course.slug,
+      subtitle: course.subtitle ?? '',
+      description: course.description,
+      target_audience: course.target_audience ?? '',
+      programming_language: course.programming_language,
+      difficulty: course.difficulty,
+      estimated_duration_minutes: course.estimated_duration_minutes,
+      objectivesText: course.learning_objectives.join('\n'),
+      status: course.status,
+    });
+    setSlugTouched(true);
+    setModalError(null);
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setError(null);
+    setModalError(null);
     try {
       const objectives = form.objectivesText
         .split('\n')
         .map((s) => s.trim())
         .filter((s) => s.length >= 2);
 
-      await apiRequest('/api/admin/courses', {
-        method: 'POST',
-        body: {
-          title: form.title,
-          slug: form.slug,
-          locale: 'az',
-          subtitle: form.subtitle || null,
-          description: form.description,
-          learning_objectives: objectives,
-          programming_language: form.programming_language,
-          difficulty: form.difficulty,
-          estimated_duration_minutes: Number(form.estimated_duration_minutes) || 0,
-          sort_order: courses.length + 1,
-          status: form.status,
-        },
-      });
+      if (editingCourse) {
+        await apiRequest(`/api/admin/courses/${editingCourse.id}`, {
+          method: 'PATCH',
+          body: {
+            title: form.title,
+            slug: form.slug,
+            subtitle: form.subtitle || null,
+            description: form.description,
+            target_audience: form.target_audience || null,
+            learning_objectives: objectives,
+            programming_language: form.programming_language,
+            difficulty: form.difficulty,
+            estimated_duration_minutes: Number(form.estimated_duration_minutes) || 0,
+            status: form.status,
+          },
+        });
+        setFeedback(`"${form.title}" kursu yeniləndi.`);
+      } else {
+        const nextSortOrder = Math.max(0, ...courses.map((c) => c.sort_order)) + 1;
+        await apiRequest('/api/admin/courses', {
+          method: 'POST',
+          body: {
+            title: form.title,
+            slug: form.slug,
+            locale: 'az',
+            subtitle: form.subtitle || null,
+            description: form.description,
+            target_audience: form.target_audience || null,
+            learning_objectives: objectives,
+            programming_language: form.programming_language,
+            difficulty: form.difficulty,
+            estimated_duration_minutes: Number(form.estimated_duration_minutes) || 0,
+            sort_order: nextSortOrder,
+            status: form.status,
+          },
+        });
+        setFeedback('Yeni kurs yaradıldı. İndi modullarını və dərslərini əlavə edə bilərsiniz.');
+      }
+
       setModalOpen(false);
-      setForm({
-        title: '',
-        slug: '',
-        subtitle: '',
-        description: '',
-        programming_language: 'python',
-        difficulty: 'beginner',
-        estimated_duration_minutes: 300,
-        objectivesText: '',
-        status: 'draft',
-      });
-      setFeedback('Yeni kurs yaradıldı. İndi modullarını və dərslərini əlavə edə bilərsiniz.');
+      setEditingCourse(null);
+      setForm(EMPTY_COURSE_FORM);
       await loadCourses();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Kurs yaradılmadı.');
+      setModalError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu.');
     } finally {
       setBusy(false);
     }
@@ -131,7 +182,7 @@ export function AdminCoursesPage() {
             edin.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setModalOpen(true)}>
+        <Button variant="primary" onClick={openCreateModal}>
           <Plus className="h-4 w-4" />
           Yeni kurs yarat
         </Button>
@@ -153,11 +204,11 @@ export function AdminCoursesPage() {
           {courses.map((course) => (
             <Card key={course.id}>
               <CardContent className="flex flex-col justify-between gap-4 p-5 lg:flex-row lg:items-center">
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-lg font-bold text-[#18181B]">
+                    <h2 className="font-display text-lg font-bold text-[#18181B]">
                       {course.title}
-                    </h3>
+                    </h2>
                     <Badge
                       variant={
                         course.status === 'published'
@@ -180,12 +231,19 @@ export function AdminCoursesPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/admin/courses/${course.id}/modules`}>
-                    <Button variant="primary" size="sm">
-                      <FolderKanban className="h-4 w-4" />
-                      Modullar
-                    </Button>
-                  </Link>
+                  <ButtonLink to={`/admin/courses/${course.id}/modules`} variant="primary" size="sm">
+                    <FolderKanban className="h-4 w-4" />
+                    Modullar
+                  </ButtonLink>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => openEditModal(course)}
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    Redaktə et
+                  </Button>
                   {course.status !== 'published' ? (
                     <Button
                       variant="outline"
@@ -227,11 +285,15 @@ export function AdminCoursesPage() {
 
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Yeni kurs yarat"
-        description="Kurs istənilən proqramlaşdırma dili üçün yaradıla bilər."
+        onClose={() => {
+          setModalOpen(false);
+          setModalError(null);
+        }}
+        title={editingCourse ? `Kursu redaktə et: ${editingCourse.title}` : 'Yeni kurs yarat'}
+        description="Kurs istənilən proqramlaşdırma dili üçün yaradıla və yenilənə bilər."
       >
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {modalError && <Alert variant="error">{modalError}</Alert>}
           <Input
             label="Kursun adı"
             required
@@ -242,12 +304,7 @@ export function AdminCoursesPage() {
               setForm((prev) => ({
                 ...prev,
                 title,
-                slug:
-                  prev.slug ||
-                  title
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/^-|-$/g, ''),
+                slug: slugTouched ? prev.slug : slugifyAz(title),
               }));
             }}
           />
@@ -257,7 +314,10 @@ export function AdminCoursesPage() {
               required
               placeholder="cpp-esaslari"
               value={form.slug}
-              onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setForm((p) => ({ ...p, slug: e.target.value }));
+              }}
             />
             <Select
               label="Proqramlaşdırma dili / Sahə"
@@ -280,6 +340,12 @@ export function AdminCoursesPage() {
             placeholder="Bir cümləlik dəyər təklifi..."
             value={form.subtitle}
             onChange={(e) => setForm((p) => ({ ...p, subtitle: e.target.value }))}
+          />
+          <Input
+            label="Hədəf auditoriya (istəyə bağlı)"
+            placeholder="Məs., Proqramlaşdırmaya sıfırdan başlayanlar"
+            value={form.target_audience}
+            onChange={(e) => setForm((p) => ({ ...p, target_audience: e.target.value }))}
           />
           <Textarea
             label="Kurs təsviri"
@@ -317,12 +383,13 @@ export function AdminCoursesPage() {
               }
             />
             <Select
-              label="İlkin status"
+              label="Status"
               value={form.status}
               onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ContentStatus }))}
             >
-              <option value="draft">Qaralama (Draft)</option>
-              <option value="published">Dərc olunmuş (Published)</option>
+              <option value="draft">Qaralama</option>
+              <option value="published">Dərc olunub</option>
+              <option value="archived">Arxivlənib</option>
             </Select>
           </div>
 
@@ -331,7 +398,7 @@ export function AdminCoursesPage() {
               Ləğv et
             </Button>
             <Button type="submit" variant="primary" isLoading={busy}>
-              Kursu yarat
+              {editingCourse ? 'Dəyişiklikləri saxla' : 'Kursu yarat'}
             </Button>
           </div>
         </form>

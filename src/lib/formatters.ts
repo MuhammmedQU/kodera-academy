@@ -1,6 +1,7 @@
 import type {
   AccountStatus,
   ApplicationStatus,
+  AttemptStatus,
   ContentStatus,
   CourseDifficulty,
   EnrollmentStatus,
@@ -73,6 +74,71 @@ export function formatEnrollmentStatusAz(status: EnrollmentStatus): string {
   }
 }
 
+export function formatAttemptStatusAz(status: AttemptStatus): string {
+  switch (status) {
+    case 'passed':
+      return 'Keçdi';
+    case 'failed':
+      return 'Uğursuz';
+    case 'error':
+      return 'İcra xətası';
+    case 'timeout':
+      return 'Vaxt limiti';
+  }
+}
+
+export function formatAuditActionAz(action: string): string {
+  const labels: Record<string, string> = {
+    'application.approved': 'Müraciət təsdiqləndi',
+    'application.rejected': 'Müraciət rədd edildi',
+    'application_note.created': 'Müraciət qeydi əlavə edildi',
+    'student.suspended': 'Tələbə hesabı donduruldu',
+    'student.reactivated': 'Tələbə hesabı aktivləşdirildi',
+    'enrollment.assigned': 'Kurs təyin edildi',
+    'enrollment.revoked': 'Kurs təyinatı ləğv edildi',
+    'course.created': 'Yeni kurs yaradıldı',
+    'course.updated': 'Kurs yeniləndi',
+    'module.created': 'Yeni modul yaradıldı',
+    'module.updated': 'Modul yeniləndi',
+    'module.visibility_changed': 'Modul görünürlüyü dəyişdirildi',
+    'lesson.created': 'Yeni dərs yaradıldı',
+    'lesson.updated': 'Dərs yeniləndi',
+    'lesson_block.created': 'Dərs bloku yaradıldı',
+    'lesson_block.updated': 'Dərs bloku yeniləndi',
+    'lesson_block.deleted': 'Dərs bloku silindi',
+    'exercise.created': 'Yeni məşq yaradıldı',
+    'quiz.created': 'Yeni quiz yaradıldı',
+    'settings.updated': 'Platforma tənzimləmələri yeniləndi',
+  };
+  return labels[action] ?? action;
+}
+
+export function slugifyAz(input: string): string {
+  const map: Record<string, string> = {
+    ə: 'e',
+    Ə: 'e',
+    ş: 's',
+    Ş: 's',
+    ç: 'c',
+    Ç: 'c',
+    ğ: 'g',
+    Ğ: 'g',
+    ö: 'o',
+    Ö: 'o',
+    ü: 'u',
+    Ü: 'u',
+    ı: 'i',
+    İ: 'i',
+  };
+  return input
+    .split('')
+    .map((ch) => map[ch] ?? ch)
+    .join('')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export function formatDateAz(iso: string | null | undefined): string {
   if (!iso) return '—';
   const date = new Date(iso);
@@ -87,16 +153,39 @@ export function formatDateAz(iso: string | null | undefined): string {
 }
 
 /**
- * Validates that a URL uses an allowed safe scheme (`https:`, `http:` in dev, `mailto:`, or relative `/`).
- * Prevents `javascript:` or `data:` XSS injection in user/CMS links and images.
+ * Validates that a link URL uses an allowed safe scheme (`https:`, `mailto:`, or safe relative `/`).
+ * Prevents `javascript:`, `data:`, and protocol-relative (`//` or `/\`) injection.
  */
 export function isSafeUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   const trimmed = url.trim();
-  if (trimmed.startsWith('/')) return !trimmed.startsWith('//');
+  if (trimmed.startsWith('/')) {
+    return !trimmed.startsWith('//') && !trimmed.startsWith('/\\');
+  }
   try {
     const parsed = new URL(trimmed);
     return parsed.protocol === 'https:' || parsed.protocol === 'mailto:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates that an image `src` URL uses `https:` or safe relative `/` (never `mailto:`, `javascript:`, or `data:`).
+ */
+export function isSafeImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('/')) {
+    return !trimmed.startsWith('//') && !trimmed.startsWith('/\\');
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:') return true;
+    if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+      return !import.meta.env.PROD;
+    }
+    return false;
   } catch {
     return false;
   }

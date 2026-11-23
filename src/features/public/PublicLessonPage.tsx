@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Clock, Globe, Lock } from 'lucide-react';
-import type { LessonViewPayload, PublicExercise } from '@shared/types/domain';
-import { Alert, Badge, Button, Spinner } from '@/components/ui';
+import type {
+  ExerciseAttemptSummary,
+  LessonViewPayload,
+  PublicExercise,
+  QuizAttemptResult,
+} from '@shared/types/domain';
+import { Alert, Badge, ButtonLink, Spinner } from '@/components/ui';
+import { usePlatformSettings } from '@/app/SettingsContext';
 import { LessonContentRenderer } from '@/features/lessons/LessonContentRenderer';
 import { RegistrationInvitationCard } from '@/features/lessons/RegistrationInvitationCard';
 import type { PythonRunOutcome } from '@/features/lessons/ExerciseBlock';
@@ -11,6 +17,7 @@ import { apiRequest, ApiError } from '@/lib/apiClient';
 
 export function PublicLessonPage() {
   const { slug, lessonSlug } = useParams<{ slug: string; lessonSlug: string }>();
+  const { settings } = usePlatformSettings();
   const [payload, setPayload] = useState<LessonViewPayload | null>(null);
   const [restrictedInfo, setRestrictedInfo] = useState<{
     courseTitle?: string;
@@ -21,13 +28,20 @@ export function PublicLessonPage() {
 
   useEffect(() => {
     if (!slug || !lessonSlug) return;
+    const controller = new AbortController();
+    window.scrollTo({ top: 0 });
     setLoading(true);
     setError(null);
     setRestrictedInfo(null);
+    setPayload(null);
 
-    apiRequest<LessonViewPayload>(`/api/public/courses/${slug}/lessons/${lessonSlug}`)
+    apiRequest<LessonViewPayload>(
+      `/api/public/courses/${encodeURIComponent(slug)}/lessons/${encodeURIComponent(lessonSlug)}`,
+      { signal: controller.signal },
+    )
       .then(setPayload)
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err instanceof ApiError && err.status === 403 && err.code === 'LESSON_RESTRICTED') {
           const details = err.details as
             | { course_title?: string; module_title?: string }
@@ -40,12 +54,63 @@ export function PublicLessonPage() {
           setError(err instanceof ApiError ? err.message : 'Dərs yüklənmədi.');
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [slug, lessonSlug]);
 
   const handleRunPython = useCallback(
-    (code: string, exercise: PublicExercise): Promise<PythonRunOutcome> =>
-      runPythonExercise(code, exercise),
+    (
+      code: string,
+      exercise: PublicExercise,
+      onStatus?: (stage: string) => void,
+    ): Promise<PythonRunOutcome> => runPythonExercise(code, exercise, onStatus),
+    [],
+  );
+
+  const handleQuizSubmitted = useCallback((quizId: string, result: QuizAttemptResult) => {
+    setPayload((prev) => {
+      if (!prev) return prev;
+      const existing = prev.previous_quiz_attempts[quizId] ?? [];
+      return {
+        ...prev,
+        previous_quiz_attempts: {
+          ...prev.previous_quiz_attempts,
+          [quizId]: [
+            {
+              id: result.attempt_id,
+              student_id: '',
+              quiz_id: quizId,
+              attempt_number: result.attempt_number,
+              earned_points: result.earned_points,
+              total_points: result.total_points,
+              score_percent: result.score_percent,
+              is_passed: result.is_passed,
+              submitted_at: new Date().toISOString(),
+            },
+            ...existing,
+          ],
+        },
+      };
+    });
+  }, []);
+
+  const handleExerciseAttemptSaved = useCallback(
+    (exerciseId: string, attempt: ExerciseAttemptSummary) => {
+      setPayload((prev) => {
+        if (!prev) return prev;
+        const existing = prev.previous_exercise_attempts[exerciseId] ?? [];
+        return {
+          ...prev,
+          previous_exercise_attempts: {
+            ...prev.previous_exercise_attempts,
+            [exerciseId]: [attempt, ...existing],
+          },
+        };
+      });
+    },
     [],
   );
 
@@ -53,7 +118,7 @@ export function PublicLessonPage() {
 
   if (restrictedInfo) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-12 sm:px-6">
         <Link
           to={`/courses/${slug}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4338CA] hover:underline"
@@ -71,17 +136,17 @@ export function PublicLessonPage() {
 
   if (error || !payload) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-14 space-y-4">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-14">
         <Alert variant="error">{error || 'Dərs tapılmadı.'}</Alert>
-        <Link to="/courses">
-          <Button variant="outline">Kurslara qayıt</Button>
-        </Link>
+        <ButtonLink to="/courses" variant="outline">
+          Kurslara qayıt
+        </ButtonLink>
       </div>
     );
   }
 
   return (
-    <article className="mx-auto max-w-4xl px-4 py-10 sm:px-6 space-y-8">
+    <article className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
       <div className="space-y-3 border-b border-zinc-200 pb-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
@@ -119,6 +184,8 @@ export function PublicLessonPage() {
         previousQuizAttempts={payload.previous_quiz_attempts}
         previousExerciseAttempts={payload.previous_exercise_attempts}
         onRunPython={handleRunPython}
+        onQuizSubmitted={handleQuizSubmitted}
+        onExerciseAttemptSaved={handleExerciseAttemptSaved}
       />
 
       {payload.is_last_public_lesson && (
@@ -131,33 +198,35 @@ export function PublicLessonPage() {
         aria-label="İctimai dərs naviqasiyası"
         className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-6"
       >
-        {payload.prev_lesson && !payload.prev_lesson.is_locked ? (
-          <Link to={`/courses/${payload.course.slug}/lessons/${payload.prev_lesson.slug}`}>
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" />
-              Əvvəlki: {payload.prev_lesson.title}
-            </Button>
-          </Link>
+        {payload.prev_lesson && !payload.prev_lesson.is_locked && payload.prev_lesson.slug ? (
+          <ButtonLink
+            to={`/courses/${payload.course.slug}/lessons/${payload.prev_lesson.slug}`}
+            variant="outline"
+            className="max-w-full"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate">Əvvəlki: {payload.prev_lesson.title}</span>
+          </ButtonLink>
         ) : (
-          <Link to={`/courses/${payload.course.slug}`}>
-            <Button variant="ghost">Kurs proqramı</Button>
-          </Link>
+          <ButtonLink to={`/courses/${payload.course.slug}`} variant="ghost">
+            Kurs proqramı
+          </ButtonLink>
         )}
 
-        {payload.next_lesson && !payload.next_lesson.is_locked ? (
-          <Link to={`/courses/${payload.course.slug}/lessons/${payload.next_lesson.slug}`}>
-            <Button variant="primary">
-              Növbəti: {payload.next_lesson.title}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        ) : payload.next_lesson?.is_locked ? (
-          <Link to="/register">
-            <Button variant="accent">
-              <Lock className="h-4 w-4" />
-              Növbəti modul üçün qeydiyyat et
-            </Button>
-          </Link>
+        {payload.next_lesson && !payload.next_lesson.is_locked && payload.next_lesson.slug ? (
+          <ButtonLink
+            to={`/courses/${payload.course.slug}/lessons/${payload.next_lesson.slug}`}
+            variant="primary"
+            className="max-w-full"
+          >
+            <span className="truncate">Növbəti: {payload.next_lesson.title}</span>
+            <ArrowRight className="h-4 w-4 shrink-0" />
+          </ButtonLink>
+        ) : payload.next_lesson?.is_locked && settings.registration_enabled ? (
+          <ButtonLink to="/register" variant="accent">
+            <Lock className="h-4 w-4 shrink-0" />
+            Növbəti modul üçün qeydiyyat et
+          </ButtonLink>
         ) : null}
       </nav>
     </article>

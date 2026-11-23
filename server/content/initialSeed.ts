@@ -5,9 +5,9 @@ import type {
   LessonItem,
   ModuleItem,
   PublicExercise,
-} from '../../src/shared/types/domain';
-import { buildPythonModule1, PY_M1_IDS } from './pythonModule1';
-import { buildPythonModule2, PY_M2_IDS } from './pythonModule2';
+} from '../../src/shared/types/domain.js';
+import { buildPythonModule1, PY_M1_IDS } from './pythonModule1.js';
+import { buildPythonModule2, PY_M2_IDS } from './pythonModule2.js';
 
 export interface SeedExercise extends PublicExercise {
   solution_code: string;

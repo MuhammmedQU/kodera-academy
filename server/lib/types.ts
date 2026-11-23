@@ -13,7 +13,7 @@ import type {
   quizSubmitSchema,
   quizUpsertSchema,
   registerSchema,
-} from '../../src/shared/validation/schemas';
+} from '../../src/shared/validation/schemas.js';
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;

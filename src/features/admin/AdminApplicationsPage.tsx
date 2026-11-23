@@ -24,41 +24,60 @@ export function AdminApplicationsPage() {
   const [items, setItems] = useState<AdminApplicationView[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<AdminApplicationView | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [confirmReverse, setConfirmReverse] = useState<'approved' | 'rejected' | null>(null);
   const [noteText, setNoteText] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const loadApplications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams();
-      if (statusFilter !== 'all') qs.set('status', statusFilter);
-      if (search.trim()) qs.set('search', search.trim());
-      const data = await apiRequest<AdminApplicationView[]>(
-        `/api/admin/applications${qs.toString() ? `?${qs.toString()}` : ''}`,
-      );
-      setItems(data);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Müraciətlər yüklənmədi.');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, search]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const loadApplications = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsFetching(true);
+      setError(null);
+      try {
+        const qs = new URLSearchParams();
+        if (statusFilter !== 'all') qs.set('status', statusFilter);
+        if (debouncedSearch.trim()) qs.set('search', debouncedSearch.trim());
+        const data = await apiRequest<AdminApplicationView[]>(
+          `/api/admin/applications${qs.toString() ? `?${qs.toString()}` : ''}`,
+          { signal },
+        );
+        setItems(data);
+      } catch (err) {
+        if (signal?.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Müraciətlər yüklənmədi.');
+      } finally {
+        if (!signal?.aborted) {
+          setInitialLoading(false);
+          setIsFetching(false);
+        }
+      }
+    },
+    [statusFilter, debouncedSearch],
+  );
 
   useEffect(() => {
-    void loadApplications();
+    const controller = new AbortController();
+    void loadApplications(controller.signal);
+    return () => controller.abort();
   }, [loadApplications]);
 
-  const handleReview = async (decision: 'approved' | 'rejected') => {
+  const executeReview = async (decision: 'approved' | 'rejected') => {
     if (!selected) return;
     setBusy(true);
-    setError(null);
+    setModalError(null);
     try {
       await apiRequest(`/api/admin/applications/${selected.application.id}/review`, {
         method: 'POST',
@@ -74,19 +93,31 @@ export function AdminApplicationsPage() {
           : 'Müraciət rədd edildi və audit jurnalına yazıldı.',
       );
       setSelected(null);
+      setConfirmReverse(null);
       setNoteText('');
       setRejectReason('');
       await loadApplications();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu.');
+      setModalError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu.');
     } finally {
       setBusy(false);
     }
   };
 
+  const handleReviewClick = (decision: 'approved' | 'rejected') => {
+    if (!selected) return;
+    // Require explicit confirmation when reversing an already-reviewed decision
+    if (selected.application.status !== 'pending' && selected.application.status !== decision) {
+      setConfirmReverse(decision);
+      return;
+    }
+    void executeReview(decision);
+  };
+
   const handleAddNoteOnly = async () => {
     if (!selected || !noteText.trim()) return;
     setBusy(true);
+    setModalError(null);
     try {
       const created = await apiRequest<AdminApplicationView['notes'][number]>(
         `/api/admin/applications/${selected.application.id}/notes`,
@@ -102,7 +133,7 @@ export function AdminApplicationsPage() {
       setNoteText('');
       await loadApplications();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Qeyd əlavə olunmadı.');
+      setModalError(err instanceof ApiError ? err.message : 'Qeyd əlavə olunmadı.');
     } finally {
       setBusy(false);
     }
@@ -144,7 +175,11 @@ export function AdminApplicationsPage() {
         </Select>
       </div>
 
-      {loading ? (
+      {isFetching && !initialLoading && (
+        <p className="text-xs text-zinc-500">Siyahı yenilənir...</p>
+      )}
+
+      {initialLoading ? (
         <Spinner label="Müraciətlər yüklənir..." />
       ) : items.length === 0 ? (
         <EmptyState
@@ -157,11 +192,11 @@ export function AdminApplicationsPage() {
           {items.map((item) => (
             <Card key={item.application.id}>
               <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-base font-bold text-[#18181B]">
+                    <h2 className="font-display text-base font-bold text-[#18181B]">
                       {item.profile.full_name}
-                    </h3>
+                    </h2>
                     <Badge
                       variant={
                         item.application.status === 'approved'
@@ -197,6 +232,8 @@ export function AdminApplicationsPage() {
                   size="sm"
                   onClick={() => {
                     setSelected(item);
+                    setModalError(null);
+                    setConfirmReverse(null);
                     setNoteText('');
                     setRejectReason(item.application.rejection_reason ?? '');
                   }}
@@ -211,7 +248,11 @@ export function AdminApplicationsPage() {
 
       <Modal
         open={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          setConfirmReverse(null);
+          setModalError(null);
+        }}
         title={selected ? `${selected.profile.full_name} — Müraciət` : ''}
         description={
           selected
@@ -221,7 +262,9 @@ export function AdminApplicationsPage() {
       >
         {selected && (
           <div className="space-y-5">
-            <div className="rounded-xl bg-[#FAFAF9] p-4 text-sm space-y-1.5">
+            {modalError && <Alert variant="error">{modalError}</Alert>}
+
+            <div className="space-y-1.5 rounded-xl bg-[#FAFAF9] p-4 text-sm">
               <p>
                 <strong>Telefon:</strong> {selected.profile.phone || 'Qeyd edilməyib'}
               </p>
@@ -266,7 +309,10 @@ export function AdminApplicationsPage() {
                   {selected.notes.map((n) => (
                     <div key={n.id} className="rounded-lg bg-zinc-50 p-2.5 text-xs">
                       <p className="text-zinc-800">{n.note}</p>
-                      <p className="mt-1 text-zinc-400">{formatDateAz(n.created_at)}</p>
+                      <p className="mt-1 text-zinc-400">
+                        {n.author_name ? `${n.author_name} • ` : ''}
+                        {formatDateAz(n.created_at)}
+                      </p>
                     </div>
                   ))}
                 </CardContent>
@@ -280,11 +326,36 @@ export function AdminApplicationsPage() {
               onChange={(e) => setRejectReason(e.target.value)}
             />
 
+            {confirmReverse && (
+              <Alert variant="warning" title="Qərar dəyişikliyini təsdiqləyin">
+                <p className="mb-3">
+                  Bu müraciət artıq <strong>{formatApplicationStatusAz(selected.application.status)}</strong>{' '}
+                  statusundadır. Qərarı{' '}
+                  <strong>{confirmReverse === 'approved' ? 'Təsdiqləndi' : 'Rədd edildi'}</strong>{' '}
+                  olaraq dəyişdirmək tələbənin hesab statusuna dərhal təsir edəcək.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={confirmReverse === 'rejected' ? 'danger' : 'primary'}
+                    size="sm"
+                    isLoading={busy}
+                    onClick={() => void executeReview(confirmReverse)}
+                  >
+                    Bəli, qərarı dəyişdir
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setConfirmReverse(null)}>
+                    Ləğv et
+                  </Button>
+                </div>
+              </Alert>
+            )}
+
             <div className="flex flex-wrap justify-end gap-3 border-t border-zinc-100 pt-4">
               <Button
                 variant="danger"
                 isLoading={busy}
-                onClick={() => handleReview('rejected')}
+                disabled={selected.application.status === 'rejected'}
+                onClick={() => handleReviewClick('rejected')}
               >
                 <XCircle className="h-4 w-4" />
                 Rədd et
@@ -292,7 +363,8 @@ export function AdminApplicationsPage() {
               <Button
                 variant="primary"
                 isLoading={busy}
-                onClick={() => handleReview('approved')}
+                disabled={selected.application.status === 'approved'}
+                onClick={() => handleReviewClick('approved')}
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Müraciəti təsdiqlə

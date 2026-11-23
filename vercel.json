@@ -4,11 +4,16 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/**/*.ts": {
+    "api/*.ts": {
       "maxDuration": 10
     }
   },
   "rewrites": [
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/public/:path*", "destination": "/api/public?__route=:path*" },
+    { "source": "/api/auth/:path*", "destination": "/api/auth?__route=:path*" },
+    { "source": "/api/student/:path*", "destination": "/api/student?__route=:path*" },
+    { "source": "/api/admin/:path*", "destination": "/api/admin?__route=:path*" },
     {
       "source": "/((?!api/|assets/|favicon\\.svg).*)",
       "destination": "/index.html"
@@ -28,12 +33,19 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/pyodide/v0.27.5/full/; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net/pyodide/v0.27.5/full/; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;"
         }
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/(auth|student|admin)/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    },
+    {
+      "source": "/api/(auth|student|admin)",
       "headers": [
         { "key": "Cache-Control", "value": "no-store" },
         { "key": "X-Content-Type-Options", "value": "nosniff" }

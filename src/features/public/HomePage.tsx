@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   BookOpen,
@@ -14,16 +13,18 @@ import {
 } from 'lucide-react';
 import type { Course } from '@shared/types/domain';
 import {
+  Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  Spinner,
 } from '@/components/ui';
 import { usePlatformSettings } from '@/app/SettingsContext';
-import { apiRequest } from '@/lib/apiClient';
+import { apiRequest, ApiError } from '@/lib/apiClient';
 import { formatDifficultyAz, formatDurationAz } from '@/lib/formatters';
 
 const FUTURE_TRACKS = [
@@ -41,14 +42,30 @@ const FUTURE_TRACKS = [
 export function HomePage() {
   const { settings } = usePlatformSettings();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiRequest<Course[]>('/api/public/courses', { auth: false })
+    const controller = new AbortController();
+    apiRequest<Course[]>('/api/public/courses', { auth: false, signal: controller.signal })
       .then((data) => setCourses(Array.isArray(data) ? data : []))
-      .catch(() => setCourses([]));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setCourses([]);
+        setCoursesError(err instanceof ApiError ? err.message : null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingCourses(false);
+      });
+    return () => controller.abort();
   }, []);
 
   const primaryPython = courses.find((c) => c.programming_language === 'python') ?? courses[0];
+  const firstLessonHref = primaryPython?.first_public_lesson_slug
+    ? `/courses/${primaryPython.slug}/lessons/${primaryPython.first_public_lesson_slug}`
+    : primaryPython
+      ? `/courses/${primaryPython.slug}`
+      : '/courses';
 
   return (
     <div>
@@ -73,23 +90,13 @@ export function HomePage() {
               olunan interaktiv məşqlərlə öyrədən müasir proqramlaşdırma akademiyasıdır.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                to={
-                  primaryPython
-                    ? `/courses/${primaryPython.slug}/lessons/proqramlasdirma-nedir`
-                    : '/courses'
-                }
-              >
-                <Button variant="primary" size="lg">
-                  Pulsuz 1-ci dərsə başla
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/courses">
-                <Button variant="outline" size="lg">
-                  Kursları kəşf et
-                </Button>
-              </Link>
+              <ButtonLink to={firstLessonHref} variant="primary" size="lg">
+                Pulsuz 1-ci dərsə başla
+                <ArrowRight className="h-4 w-4" />
+              </ButtonLink>
+              <ButtonLink to="/courses" variant="outline" size="lg">
+                Kursları kəşf et
+              </ButtonLink>
             </div>
             <p className="mt-4 text-xs text-zinc-500">
               İlk versiyada onlayn ödəniş yoxdur. Əvvəlcə pulsuz dərsləri oxuyun, tədris keyfiyyətini
@@ -191,50 +198,56 @@ print("Bu gün", hedef, "öyrənirik!")`}
                 Python ilə başlayın, gələcək sahələrə böyüyün
               </h2>
             </div>
-            <Link to="/courses">
-              <Button variant="outline">
-                Bütün kurslar
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            <ButtonLink to="/courses" variant="outline">
+              Bütün kurslar
+              <ArrowRight className="h-4 w-4" />
+            </ButtonLink>
           </div>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-            {courses.map((course) => (
-              <Card key={course.id} className="flex flex-col justify-between">
-                <CardHeader>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="brand">{course.programming_language.toUpperCase()}</Badge>
-                    <Badge variant="neutral">{formatDifficultyAz(course.difficulty)}</Badge>
-                    {(course.public_module_count ?? 0) > 0 && (
-                      <Badge variant="amber">
-                        İlk {course.public_module_count} modul pulsuz
-                      </Badge>
-                    )}
-                  </div>
-                  <CardTitle className="mt-2 text-xl">{course.title}</CardTitle>
-                  <CardDescription className="leading-relaxed">
-                    {course.subtitle || course.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap gap-4 text-xs text-zinc-500">
-                    <span>{course.total_module_count ?? 0} modul</span>
-                    <span>•</span>
-                    <span>{course.total_lesson_count ?? 0} dərs</span>
-                    <span>•</span>
-                    <span>{formatDurationAz(course.estimated_duration_minutes)}</span>
-                  </div>
-                  <Link to={`/courses/${course.slug}`}>
-                    <Button variant="primary" className="w-full">
+          {loadingCourses ? (
+            <div className="mt-8">
+              <Spinner label="Kurslar yüklənir..." />
+            </div>
+          ) : coursesError ? (
+            <Alert variant="warning" className="mt-8">
+              {coursesError}
+            </Alert>
+          ) : (
+            <div className="mt-8 grid gap-6 md:grid-cols-2">
+              {courses.map((course) => (
+                <Card key={course.id} className="flex flex-col justify-between">
+                  <CardHeader>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="brand">{course.programming_language.toUpperCase()}</Badge>
+                      <Badge variant="neutral">{formatDifficultyAz(course.difficulty)}</Badge>
+                      {(course.public_module_count ?? 0) > 0 && (
+                        <Badge variant="amber">
+                          İlk {course.public_module_count} modul pulsuz
+                        </Badge>
+                      )}
+                    </div>
+                    <CardTitle className="mt-2 text-xl">{course.title}</CardTitle>
+                    <CardDescription className="leading-relaxed">
+                      {course.subtitle || course.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-4 text-xs text-zinc-500">
+                      <span>{course.total_module_count ?? 0} modul</span>
+                      <span>•</span>
+                      <span>{course.total_lesson_count ?? 0} dərs</span>
+                      <span>•</span>
+                      <span>{formatDurationAz(course.estimated_duration_minutes)}</span>
+                    </div>
+                    <ButtonLink to={`/courses/${course.slug}`} variant="primary" className="w-full">
                       Kurs proqramına bax
                       <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </ButtonLink>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           <div className="mt-10 rounded-2xl border border-zinc-200 bg-[#FAFAF9] p-6">
             <div className="flex items-center gap-2 font-display text-sm font-bold text-[#18181B]">
@@ -278,7 +291,7 @@ print("Bu gün", hedef, "öyrənirik!")`}
             {
               step: '02',
               title: 'Qeydiyyat müraciəti et',
-              desc: 'Ad, email və öyrənmə məqsədinizlə müraciət göndərin. Hesabınız PENDING statusunda yaranır.',
+              desc: 'Ad, email və öyrənmə məqsədinizlə müraciət göndərin. Hesabınız gözləmə statusunda yaranır.',
             },
             {
               step: '03',
@@ -317,28 +330,16 @@ print("Bu gün", hedef, "öyrənirik!")`}
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link
-                to={
-                  primaryPython
-                    ? `/courses/${primaryPython.slug}/lessons/proqramlasdirma-nedir`
-                    : '/courses'
-                }
-              >
-                <Button variant="accent" size="lg">
-                  <Compass className="h-4 w-4" />
-                  Pulsuz dərslərə başla
-                </Button>
-              </Link>
-              <Link to="/register">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700"
-                >
+              <ButtonLink to={firstLessonHref} variant="accent" size="lg">
+                <Compass className="h-4 w-4" />
+                Pulsuz dərslərə başla
+              </ButtonLink>
+              {settings.registration_enabled && (
+                <ButtonLink to="/register" variant="outlineLight" size="lg">
                   <CheckCircle2 className="h-4 w-4" />
                   Müraciət et
-                </Button>
-              </Link>
+                </ButtonLink>
+              )}
             </div>
           </div>
         </div>

@@ -33,12 +33,13 @@ function createBrowserPythonWorker(): PythonWorkerLike {
  * - UI main thread NEVER freezes.
  * - Infinite loops (e.g. `while True: pass`) are strictly terminated via `worker.terminate()`
  *   once `timeLimitMs` expires after runtime readiness.
- * - Output is truncated to `maxOutputChars`.
+ * - Cancelling/stopping settles pending promises immediately and clears all timers (zero leaks).
  */
 export class PythonWorkerRunner {
   private worker: PythonWorkerLike | null = null;
   private isReady = false;
   private factory: WorkerFactory;
+  private activeCancel: ((reason?: string) => void) | null = null;
 
   constructor(factory: WorkerFactory = createBrowserPythonWorker) {
     this.factory = factory;
@@ -52,7 +53,12 @@ export class PythonWorkerRunner {
     return this.worker;
   }
 
-  public terminate(): void {
+  public terminate(reason = 'İcra istifadəçi tərəfindən dayandırıldı.'): void {
+    const cancel = this.activeCancel;
+    this.activeCancel = null;
+    if (cancel) {
+      cancel(reason);
+    }
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
@@ -66,6 +72,7 @@ export class PythonWorkerRunner {
       timeLimitMs: number;
       maxOutputChars: number;
       testCases: WorkerRunRequest['testCases'];
+      onStatus?: (stage: string) => void;
     },
   ): Promise<PythonRunOutcome> {
     if (typeof Worker === 'undefined' && this.factory === createBrowserPythonWorker) {
@@ -78,6 +85,10 @@ export class PythonWorkerRunner {
       });
     }
 
+    if (this.activeCancel) {
+      this.terminate('Əvvəlki icra yeni sorğu ilə əvəz olundu.');
+    }
+
     const worker = this.ensureWorker();
     const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const clampedLimit = Math.min(Math.max(options.timeLimitMs, 500), 15_000);
@@ -86,15 +97,39 @@ export class PythonWorkerRunner {
       let settled = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
 
+      const finish = (outcome: PythonRunOutcome) => {
+        if (settled) return;
+        settled = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        worker.removeEventListener('message', onMessage);
+        worker.removeEventListener('error', onError);
+        if (this.activeCancel === cancelCurrent) {
+          this.activeCancel = null;
+        }
+        resolve(outcome);
+      };
+
+      const cancelCurrent = (reason?: string) => {
+        finish({
+          status: 'timeout',
+          stdout: '',
+          stderr: reason || 'İcra istifadəçi tərəfindən dayandırıldı.',
+          executionTimeMs: 0,
+          testResults: [],
+          cancelled: true,
+        });
+      };
+
+      this.activeCancel = cancelCurrent;
+
       const armTimer = (ms: number, isBootstrap: boolean) => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           if (settled) return;
-          settled = true;
-          cleanup();
-          // Hard-kill the Worker to stop infinite loops cleanly without freezing UI
-          this.terminate();
-          resolve({
+          finish({
             status: isBootstrap ? 'error' : 'timeout',
             stdout: '',
             stderr: isBootstrap
@@ -103,6 +138,11 @@ export class PythonWorkerRunner {
             executionTimeMs: ms,
             testResults: [],
           });
+          if (this.worker === worker) {
+            this.worker.terminate();
+            this.worker = null;
+            this.isReady = false;
+          }
         }, ms);
       };
 
@@ -111,33 +151,36 @@ export class PythonWorkerRunner {
         const msg = event.data;
         if (!msg) return;
 
+        if (msg.type === 'loading') {
+          options.onStatus?.(msg.stage);
+          return;
+        }
+
         if (msg.type === 'ready') {
           this.isReady = true;
-          // Once Pyodide is loaded, enforce the exact strict execution time limit
+          options.onStatus?.('Python kodu icra olunur...');
           armTimer(clampedLimit, false);
           return;
         }
 
         if (msg.type === 'init_error' && (!msg.id || msg.id === runId)) {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          this.terminate();
-          resolve({
+          finish({
             status: 'error',
             stdout: '',
             stderr: msg.message,
             executionTimeMs: 0,
             testResults: [],
           });
+          if (this.worker === worker) {
+            this.worker.terminate();
+            this.worker = null;
+            this.isReady = false;
+          }
           return;
         }
 
         if (msg.type === 'result' && msg.id === runId) {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          resolve({
+          finish({
             status: msg.status,
             stdout: msg.stdout,
             stderr: msg.stderr,
@@ -148,24 +191,19 @@ export class PythonWorkerRunner {
       };
 
       const onError = (ev: MessageEvent<WorkerOutboundMessage> | ErrorEvent) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        this.terminate();
         const message = 'message' in ev && ev.message ? ev.message : 'Worker icra xətası baş verdi.';
-        resolve({
+        finish({
           status: 'error',
           stdout: '',
           stderr: message,
           executionTimeMs: 0,
           testResults: [],
         });
-      };
-
-      const cleanup = () => {
-        if (timer) clearTimeout(timer);
-        worker.removeEventListener('message', onMessage);
-        worker.removeEventListener('error', onError);
+        if (this.worker === worker) {
+          this.worker.terminate();
+          this.worker = null;
+          this.isReady = false;
+        }
       };
 
       worker.addEventListener('message', onMessage);
@@ -188,6 +226,7 @@ const sharedRunner = new PythonWorkerRunner();
 export function runPythonExercise(
   code: string,
   exercise: PublicExercise,
+  onStatus?: (stage: string) => void,
 ): Promise<PythonRunOutcome> {
   return sharedRunner.run(code, {
     timeLimitMs: exercise.time_limit_ms,
@@ -198,6 +237,7 @@ export function runPythonExercise(
       expected_stdout: tc.expected_stdout,
       assertion_code: tc.assertion_code,
     })),
+    onStatus,
   });
 }
 

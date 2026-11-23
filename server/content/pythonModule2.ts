@@ -2,9 +2,9 @@ import type {
   AdminQuiz,
   LessonContentBlock,
   LessonItem,
-} from '../../src/shared/types/domain';
-import type { SeedExercise } from './initialSeed';
-import type { ModuleContentBundle } from './pythonModule1';
+} from '../../src/shared/types/domain.js';
+import type { SeedExercise } from './initialSeed.js';
+import type { ModuleContentBundle } from './pythonModule1.js';
 
 const NOW = '2026-11-24T00:00:00.000Z';
 

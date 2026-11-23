@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { Alert, Badge, BrandLogo, Button, Input } from '@/components/ui';
 import { buildWhatsAppContactUrl } from '@/lib/whatsapp';
-import { isSafeUrl } from '@/lib/formatters';
+import { isSafeImageUrl, isSafeUrl, slugifyAz } from '@/lib/formatters';
+import { cn } from '@/lib/cn';
 import { App } from '@/App';
 import { SettingsProvider } from '@/app/SettingsContext';
 import { AuthProvider } from '@/app/AuthContext';
@@ -80,6 +81,17 @@ describe('Phase 3 — Kodera Design System & Foundation', () => {
     expect(isSafeUrl('mailto:info@kodera.academy')).toBe(true);
     expect(isSafeUrl('javascript:alert(1)')).toBe(false);
     expect(isSafeUrl('//evil.example.com')).toBe(false);
+    expect(isSafeUrl('/\\evil.example.com')).toBe(false);
+
+    expect(isSafeImageUrl('https://cdn.example.com/img.png')).toBe(true);
+    expect(isSafeImageUrl('/media/diagram.png')).toBe(true);
+    expect(isSafeImageUrl('mailto:info@kodera.academy')).toBe(false);
+    expect(isSafeImageUrl('javascript:alert(1)')).toBe(false);
+
+    // tailwind-merge resolves conflicting utility overrides predictably
+    expect(cn('text-zinc-600 p-6', 'text-zinc-200 p-4')).toBe('text-zinc-200 p-4');
+    // Azerbaijani slug transliteration
+    expect(slugifyAz('Əsas Proqramlaşdırma & Şərtlər')).toBe('esas-proqramlasdirma-sertler');
   });
 
   it('renders public shell homepage cleanly', async () => {

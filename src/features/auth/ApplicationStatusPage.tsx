@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Archive,
   Ban,
   Check,
   CheckCircle2,
@@ -10,12 +11,14 @@ import {
   LayoutDashboard,
   MessageCircle,
   RefreshCw,
+  ShieldCheck,
   XCircle,
 } from 'lucide-react';
 import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -33,6 +36,13 @@ export function ApplicationStatusPage() {
   const { settings } = usePlatformSettings();
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   if (isLoading) {
     return <Spinner fullPage label="Müraciət statusu yüklənir..." />;
@@ -44,23 +54,21 @@ export function ApplicationStatusPage() {
       <div className="mx-auto max-w-lg px-4 py-16">
         <Card>
           <CardHeader>
-            <CardTitle>Müraciət statusunu görmək üçün daxil olun</CardTitle>
+            <CardTitle as="h1">Müraciət statusunu görmək üçün daxil olun</CardTitle>
             <CardDescription>
               Şəxsi məlumatlarınızın məxfiliyini qorumaq üçün müraciət statusu yalnız hesabınıza
               daxil olduqdan sonra göstərilir.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row">
-            <Link to="/login" className="flex-1">
-              <Button variant="primary" className="w-full">
-                Hesaba daxil ol
-              </Button>
-            </Link>
-            <Link to="/register" className="flex-1">
-              <Button variant="outline" className="w-full">
+            <ButtonLink to="/login" variant="primary" className="flex-1">
+              Hesaba daxil ol
+            </ButtonLink>
+            {settings.registration_enabled && (
+              <ButtonLink to="/register" variant="outline" className="flex-1">
                 Yeni müraciət et
-              </Button>
-            </Link>
+              </ButtonLink>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -69,7 +77,7 @@ export function ApplicationStatusPage() {
 
   const { profile, application } = user;
   const accountStatus = profile.account_status;
-  const appStatus = application?.status ?? 'pending';
+  const appStatus = application?.status ?? null;
 
   const whatsapp =
     application && accountStatus === 'pending'
@@ -86,7 +94,8 @@ export function ApplicationStatusPage() {
     try {
       await navigator.clipboard.writeText(application.reference_code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may be unavailable in restricted contexts
     }
@@ -116,13 +125,23 @@ export function ApplicationStatusPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Cari vəziyyət</CardTitle>
-            {accountStatus === 'suspended' ? (
+            <CardTitle as="h2">Cari vəziyyət</CardTitle>
+            {user.isAdmin ? (
+              <Badge variant="brand">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Administrator hesabı
+              </Badge>
+            ) : accountStatus === 'suspended' ? (
               <Badge variant="danger">
                 <Ban className="h-3.5 w-3.5" />
-                Hesab dondurulub (SUSPENDED)
+                Hesab dondurulub
               </Badge>
-            ) : appStatus === 'approved' ? (
+            ) : accountStatus === 'archived' ? (
+              <Badge variant="neutral">
+                <Archive className="h-3.5 w-3.5" />
+                Hesab arxivlənib
+              </Badge>
+            ) : appStatus === 'approved' || accountStatus === 'active' ? (
               <Badge variant="success">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {formatApplicationStatusAz('approved')}
@@ -167,16 +186,38 @@ export function ApplicationStatusPage() {
             </div>
           )}
 
+          {/* ADMIN */}
+          {user.isAdmin && (
+            <div className="space-y-4">
+              <Alert variant="info" title="Administrator hesabı ilə daxil olmusunuz">
+                Administrator hesabları üçün qeydiyyat müraciəti tələb olunmur. Tələbə
+                müraciətlərini idarə etmək üçün Admin Panelinə keçə bilərsiniz.
+              </Alert>
+              <ButtonLink to="/admin" variant="secondary" size="lg" className="w-full">
+                <ShieldCheck className="h-4 w-4" />
+                Admin Panelinə keç
+              </ButtonLink>
+            </div>
+          )}
+
           {/* SUSPENDED */}
-          {accountStatus === 'suspended' && (
+          {!user.isAdmin && accountStatus === 'suspended' && (
             <Alert variant="error" title="Hesabınız müvəqqəti dondurulub">
               Hesabınıza giriş administrator tərəfindən dayandırılıb. Əlavə məlumat üçün rəsmi əlaqə
               kanalı ({settings.contact_email || 'akademiya rəhbərliyi'}) ilə əlaqə saxlayın.
             </Alert>
           )}
 
+          {/* ARCHIVED */}
+          {!user.isAdmin && accountStatus === 'archived' && (
+            <Alert variant="warning" title="Hesabınız arxivlənib">
+              Bu hesab arxiv statusundadır. Hesabın yenidən aktivləşdirilməsi üçün rəsmi əlaqə
+              kanalı ({settings.contact_email || 'akademiya rəhbərliyi'}) ilə əlaqə saxlayın.
+            </Alert>
+          )}
+
           {/* PENDING */}
-          {accountStatus === 'pending' && appStatus === 'pending' && (
+          {!user.isAdmin && accountStatus === 'pending' && (appStatus === 'pending' || !appStatus) && (
             <div className="space-y-4">
               <Alert variant="warning" title="Müraciətiniz administrator təsdiqini gözləyir">
                 Hesabınız yaradıldı, lakin tam kurs materiallarına giriş yalnız administrator
@@ -200,11 +241,11 @@ export function ApplicationStatusPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       data-testid="whatsapp-contact-link"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-emerald-700"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-emerald-700"
                     >
-                      <MessageCircle className="h-4 w-4" />
+                      <MessageCircle className="h-4 w-4 shrink-0" />
                       {settings.whatsapp_button_label}
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                     </a>
                   </div>
                   <p className="mt-3 text-xs text-emerald-800">
@@ -225,35 +266,36 @@ export function ApplicationStatusPage() {
           )}
 
           {/* APPROVED */}
-          {accountStatus === 'active' && appStatus === 'approved' && (
+          {!user.isAdmin && accountStatus === 'active' && (
             <div className="space-y-4">
               <Alert variant="success" title="Təbrik edirik! Müraciətiniz təsdiqləndi">
                 Hesabınız aktivdir. Administrator tərəfindən sizə təyin edilmiş kursları Tələbə
                 Panelində görə və dərslərə başlaya bilərsiniz.
               </Alert>
-              <Link to="/dashboard">
-                <Button variant="primary" size="lg" className="w-full">
-                  <LayoutDashboard className="h-4 w-4" />
-                  Tələbə Panelinə keç
-                </Button>
-              </Link>
+              <ButtonLink to="/dashboard" variant="primary" size="lg" className="w-full">
+                <LayoutDashboard className="h-4 w-4" />
+                Tələbə Panelinə keç
+              </ButtonLink>
             </div>
           )}
 
           {/* REJECTED */}
-          {appStatus === 'rejected' && accountStatus !== 'suspended' && (
-            <Alert variant="error" title="Müraciətiniz təsdiqlənmədi">
-              <p>Təəssüf ki, hazırkı qeydiyyat müraciətiniz təsdiqlənmədi.</p>
-              {application?.rejection_reason && (
-                <p className="mt-2 font-medium">Səbəb: {application.rejection_reason}</p>
-              )}
-              {settings.contact_email && (
-                <p className="mt-2 text-xs">
-                  Əlavə sualınız varsa: <strong>{settings.contact_email}</strong>
-                </p>
-              )}
-            </Alert>
-          )}
+          {!user.isAdmin &&
+            appStatus === 'rejected' &&
+            accountStatus !== 'suspended' &&
+            accountStatus !== 'archived' && (
+              <Alert variant="error" title="Müraciətiniz təsdiqlənmədi">
+                <p>Təəssüf ki, hazırkı qeydiyyat müraciətiniz təsdiqlənmədi.</p>
+                {application?.rejection_reason && (
+                  <p className="mt-2 font-medium">Səbəb: {application.rejection_reason}</p>
+                )}
+                {settings.contact_email && (
+                  <p className="mt-2 text-xs">
+                    Əlavə sualınız varsa: <strong>{settings.contact_email}</strong>
+                  </p>
+                )}
+              </Alert>
+            )}
 
           <div className="flex flex-wrap justify-between gap-3 border-t border-zinc-100 pt-4 text-sm">
             <Link to="/courses" className="font-semibold text-[#4338CA] hover:underline">

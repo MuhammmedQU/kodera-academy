@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { KeyRound, LogOut, ShieldCheck } from 'lucide-react';
+import type { z } from 'zod';
+import { resetPasswordSchema } from '@shared/validation/schemas';
 import {
   Alert,
   Button,
@@ -14,27 +18,41 @@ import {
 import { useAuth } from '@/app/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 
+type PasswordForm = z.infer<typeof resetPasswordSchema>;
+
+function mapSupabasePasswordError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('different from the old password')) {
+    return 'Yeni şifrə əvvəlki şifrədən fərqli olmalıdır.';
+  }
+  if (lower.includes('reauthentication') || lower.includes('nonce')) {
+    return 'Təhlükəsizlik siyasətinə görə şifrə dəyişmək üçün yenidən daxil olmalı və ya "Şifrəni unutdum" bərpa linkindən istifadə etməlisiniz.';
+  }
+  if (lower.includes('weak') || lower.includes('password')) {
+    return 'Şifrə təhlükəsizlik tələblərinə cavab vermir. Daha güclü şifrə seçin.';
+  }
+  return 'Şifrə yenilənərkən xəta baş verdi. Zəhmət olmasa yenidən cəhd edin.';
+}
+
 export function StudentSettingsPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<PasswordForm>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { password: '', confirmPassword: '' },
+  });
+
+  const onSubmit = async (values: PasswordForm) => {
     setError(null);
     setFeedback(null);
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      setError('Şifrə ən azı 8 simvol, hərf və rəqəmdən ibarət olmalıdır.');
-      return;
-    }
-    if (password !== confirm) {
-      setError('Şifrələr uyğun gəlmir.');
-      return;
-    }
 
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -42,15 +60,12 @@ export function StudentSettingsPage() {
       return;
     }
 
-    setSaving(true);
-    const { error: supaErr } = await supabase.auth.updateUser({ password });
-    setSaving(false);
+    const { error: supaErr } = await supabase.auth.updateUser({ password: values.password });
     if (supaErr) {
-      setError(supaErr.message);
+      setError(mapSupabasePasswordError(supaErr.message));
       return;
     }
-    setPassword('');
-    setConfirm('');
+    reset();
     setFeedback('Şifrəniz uğurla yeniləndi.');
   };
 
@@ -63,7 +78,7 @@ export function StudentSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle as="h2" className="flex items-center gap-2 text-base">
             <KeyRound className="h-5 w-5 text-[#4338CA]" />
             Şifrəni yenilə
           </CardTitle>
@@ -82,22 +97,24 @@ export function StudentSettingsPage() {
               {error}
             </Alert>
           )}
-          <form onSubmit={handlePasswordChange} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Input
               label="Yeni şifrə"
               type="password"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              error={errors.password?.message}
+              {...register('password')}
             />
             <Input
               label="Yeni şifrə təsdiqi"
               type="password"
               required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+              error={errors.confirmPassword?.message}
+              {...register('confirmPassword')}
             />
-            <Button type="submit" variant="primary" isLoading={saving}>
+            <Button type="submit" variant="primary" isLoading={isSubmitting}>
               Şifrəni yenilə
             </Button>
           </form>
@@ -106,7 +123,7 @@ export function StudentSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle as="h2" className="flex items-center gap-2 text-base">
             <ShieldCheck className="h-5 w-5 text-emerald-600" />
             Giriş və Sessiya
           </CardTitle>

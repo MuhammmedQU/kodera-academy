@@ -21,7 +21,7 @@ function walkFiles(dir, extensions) {
   return results;
 }
 
-// 1. Check frontend src/ for forbidden secret identifiers & unsafe DOM injection
+// 1. Check frontend src/ for forbidden secret identifiers & unsafe DOM/code execution
 for (const file of walkFiles(path.join(ROOT, 'src'), ['.ts', '.tsx', '.js', '.jsx'])) {
   const content = fs.readFileSync(file, 'utf8');
   const rel = path.relative(ROOT, file);
@@ -35,15 +35,30 @@ for (const file of walkFiles(path.join(ROOT, 'src'), ['.ts', '.tsx', '.js', '.js
   if (content.includes('dangerouslySetInnerHTML')) {
     errors.push(`[XSS-RISK] ${rel} uses dangerouslySetInnerHTML.`);
   }
+  if (/\beval\s*\(/.test(content) || /\bnew\s+Function\s*\(/.test(content)) {
+    errors.push(`[CODE-INJECTION] ${rel} uses dynamic eval() or new Function().`);
+  }
+  if (/\.innerHTML\s*=/.test(content)) {
+    errors.push(`[XSS-RISK] ${rel} assigns directly to innerHTML.`);
+  }
 }
 
-// 2. Check built dist/ bundle if it exists for service role key references
+// 2. Check built dist/ bundle if it exists for service role keys, hardcoded JWTs, or dev credentials
 if (fs.existsSync(path.join(ROOT, 'dist'))) {
   for (const file of walkFiles(path.join(ROOT, 'dist'), ['.js', '.html', '.css'])) {
     const content = fs.readFileSync(file, 'utf8');
     const rel = path.relative(ROOT, file);
     if (content.includes('SUPABASE_SERVICE_ROLE_KEY')) {
       errors.push(`[BUNDLE-LEAK] Built asset ${rel} contains SUPABASE_SERVICE_ROLE_KEY.`);
+    }
+    if (/sb_secret_[A-Za-z0-9_-]{16,}/.test(content)) {
+      errors.push(`[BUNDLE-LEAK] Built asset ${rel} contains a hardcoded Supabase secret key.`);
+    }
+    if (/eyJhbGciOi[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/.test(content)) {
+      errors.push(`[BUNDLE-LEAK] Built asset ${rel} contains a hardcoded JWT token.`);
+    }
+    if (content.includes('AdminPass123!') || content.includes('StudentPass123!')) {
+      errors.push(`[BUNDLE-LEAK] Built production asset ${rel} leaked dev sandbox password.`);
     }
   }
 }

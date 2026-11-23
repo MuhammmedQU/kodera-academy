@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Lock, Sparkles } from 'lucide-react';
-import { Button, Card, CardContent } from '@/components/ui';
+import { ButtonLink, Card, CardContent } from '@/components/ui';
+import { usePlatformSettings } from '@/app/SettingsContext';
 
 interface RegistrationInvitationCardProps {
   courseTitle?: string;
@@ -11,6 +11,8 @@ export function RegistrationInvitationCard({
   courseTitle,
   restrictedModuleTitle,
 }: RegistrationInvitationCardProps) {
+  const { settings } = usePlatformSettings();
+
   return (
     <Card className="overflow-hidden border-[#4338CA]/30 bg-gradient-to-br from-[#18181B] via-[#1E1B4B] to-[#312E81] text-white shadow-lg">
       <CardContent className="p-6 sm:p-8">
@@ -30,7 +32,7 @@ export function RegistrationInvitationCard({
 
         <h2 className="mt-4 font-display text-2xl font-extrabold text-white sm:text-3xl">
           {restrictedModuleTitle
-            ? `"${restrictedModuleTitle}" modulunu açmaq üçün Kodera-ya qoşulun`
+            ? `"${restrictedModuleTitle}" modulunu açmaq üçün ${settings.academy_name} akademiyasına qoşulun`
             : 'Öyrənməyə tam proqramla davam etməyə hazırsınız?'}
         </h2>
 
@@ -59,21 +61,15 @@ export function RegistrationInvitationCard({
         </div>
 
         <div className="mt-7 flex flex-wrap items-center gap-3">
-          <Link to="/register">
-            <Button variant="accent" size="lg">
+          {settings.registration_enabled && (
+            <ButtonLink to="/register" variant="accent" size="lg">
               Qeydiyyat müraciəti et
               <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link to="/login">
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-white/25 bg-white/10 text-white hover:bg-white/20"
-            >
-              Artıq hesabım var — Daxil ol
-            </Button>
-          </Link>
+            </ButtonLink>
+          )}
+          <ButtonLink to="/login" variant="outlineLight" size="lg">
+            Artıq hesabım var — Daxil ol
+          </ButtonLink>
         </div>
       </CardContent>
     </Card>

@@ -17,7 +17,9 @@ export class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): State {
     return {
       hasError: true,
-      message: error?.message || 'Gözlənilməz tətbiq xətası baş verdi.',
+      message: import.meta.env.PROD
+        ? 'Səhifəni göstərərkən gözlənilməz xəta baş verdi. Zəhmət olmasa ana səhifəyə qayıdıb yenidən cəhd edin.'
+        : error?.message || 'Gözlənilməz tətbiq xətası baş verdi.',
     };
   }
 

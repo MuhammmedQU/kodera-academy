@@ -150,20 +150,143 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await expect(page.getByText(/Tamamlandı \(geri al\)/i)).toBeVisible();
   });
 
-  test('Mobile viewport (375px) renders responsive public pages and legal pages with zero horizontal overflow', async ({
+  test('Mobile (375px), Tablet (768px) & Desktop (1440px) responsive, a11y, 404, and zero console error audit across Public, Student & Admin pages', async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    for (const path of ['/', '/courses', '/about', '/privacy', '/terms', '/login', '/register']) {
-      await page.goto(path);
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - window.innerWidth,
-      );
-      expect(overflow, `Horizontal overflow on ${path}`).toBeLessThanOrEqual(2);
+    test.setTimeout(90_000);
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', (err) => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') runtimeErrors.push(`console.error: ${msg.text()}`);
+    });
+
+    const viewports = [
+      { name: 'mobile', width: 375, height: 812 },
+      { name: 'tablet', width: 768, height: 1024 },
+      { name: 'desktop', width: 1440, height: 900 },
+    ] as const;
+
+    const assertAllViewportsClean = async (routePath: string) => {
+      await page.goto(routePath, { waitUntil: 'domcontentloaded' });
+      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 10_000 });
+      await page.waitForTimeout(150);
+
+      for (const vp of viewports) {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        const metrics = await page.evaluate(
+          () =>
+            new Promise<{ overflow: number; nestedInteractive: number }>((resolve) => {
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  resolve({
+                    overflow: document.documentElement.scrollWidth - window.innerWidth,
+                    nestedInteractive: document.querySelectorAll('a button, button a').length,
+                  });
+                }),
+              );
+            }),
+        );
+        expect(metrics.overflow, `Horizontal overflow on ${vp.name}:${routePath}`).toBeLessThanOrEqual(2);
+        expect(
+          metrics.nestedInteractive,
+          `Invalid nested <a><button> on ${vp.name}:${routePath}`,
+        ).toBe(0);
+      }
+    };
+
+    // 1. Public pages across Mobile, Tablet, Desktop (10 routes x 3 viewports = 30 checks)
+    const publicPaths = [
+      '/',
+      '/courses',
+      '/courses/python-esaslari',
+      '/courses/python-esaslari/lessons/proqramlasdirma-nedir',
+      '/about',
+      '/privacy',
+      '/terms',
+      '/login',
+      '/register',
+      '/forgot-password',
+    ];
+    for (const routePath of publicPaths) {
+      await assertAllViewportsClean(routePath);
     }
 
+    // Mobile public menu open + Escape close
+    await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
     await page.getByRole('button', { name: /Menyunu aç/i }).click();
     await expect(page.getByLabel('Mobil naviqasiya')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Mobil naviqasiya')).toHaveCount(0);
+
+    // 2. Student Dashboard pages across Mobile, Tablet, Desktop + 404 inside /dashboard/*
+    await page.goto('/login');
+    await page.getByLabel(/Email ünvanı/i).fill('student@kodera.local');
+    await page.getByLabel(/Şifrə/i).fill('StudentPass123!');
+    await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByRole('heading', { name: /Xoş gəldiniz/i })).toBeVisible();
+
+    // Verify Mobile Dashboard Drawer has public site link and closes on Escape
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByRole('button', { name: /Menyunu aç/i }).click();
+    await expect(page.getByRole('link', { name: /İctimai sayta keç/i })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    for (const stPath of [
+      '/dashboard',
+      '/dashboard/courses',
+      '/dashboard/courses/python-esaslari',
+      '/dashboard/courses/python-esaslari/lessons/ilk-python-kodu-print',
+      '/dashboard/progress',
+      '/dashboard/profile',
+      '/dashboard/settings',
+    ]) {
+      await assertAllViewportsClean(stPath);
+    }
+
+    // Verify 404 inside /dashboard/* renders NotFoundPage (not blank main)
+    await page.goto('/dashboard/nonexistent-page');
+    await expect(page.getByRole('heading', { name: /Səhifə tapılmadı/i })).toBeVisible();
+
+    // Logout & switch to Admin
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByRole('button', { name: /Menyunu aç/i }).click();
+    await page.getByRole('button', { name: /Hesabdan çıx/i }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(page.getByRole('link', { name: /Daxil ol/i }).first()).toBeVisible();
+
+    // 3. Admin Dashboard pages across Mobile, Tablet, Desktop + 404 inside /admin/*
+    await page.goto('/login');
+    await page.getByLabel(/Email ünvanı/i).fill('admin@kodera.local');
+    await page.getByLabel(/Şifrə/i).fill('AdminPass123!');
+    await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
+    await expect(page).toHaveURL(/\/admin$/);
+
+    for (const admPath of [
+      '/admin',
+      '/admin/applications',
+      '/admin/students',
+      '/admin/enrollments',
+      '/admin/courses',
+      '/admin/settings',
+      '/admin/audit-logs',
+    ]) {
+      await assertAllViewportsClean(admPath);
+    }
+
+    // Verify Admin Course Create modal opens & auto-slug works properly with Azerbaijani diacritics
+    await page.goto('/admin/courses');
+    await page.getByRole('button', { name: /Yeni kurs yarat/i }).click();
+    await page.getByLabel(/Kursun adı/i).fill('Şəbəkə Əsasları');
+    await expect(page.getByLabel(/URL Slug/i)).toHaveValue('sebeke-esaslari');
+    await page.keyboard.press('Escape');
+
+    // Verify 404 inside /admin/*
+    await page.goto('/admin/does-not-exist');
+    await expect(page.getByRole('heading', { name: /Səhifə tapılmadı/i })).toBeVisible();
+
+    expect(runtimeErrors, `Uncaught console/page errors: ${runtimeErrors.join('\n')}`).toEqual([]);
   });
 });

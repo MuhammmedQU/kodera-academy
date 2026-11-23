@@ -13,7 +13,7 @@ import type { AdminDashboardStats } from '@shared/types/domain';
 import {
   Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -22,7 +22,7 @@ import {
   Spinner,
 } from '@/components/ui';
 import { apiRequest, ApiError } from '@/lib/apiClient';
-import { formatDateAz } from '@/lib/formatters';
+import { formatAuditActionAz, formatDateAz } from '@/lib/formatters';
 
 export function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
@@ -30,20 +30,17 @@ export function AdminOverviewPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let active = true;
-    apiRequest<AdminDashboardStats>('/api/admin/stats')
-      .then((data) => {
-        if (active) setStats(data);
-      })
+    const controller = new AbortController();
+    apiRequest<AdminDashboardStats>('/api/admin/stats', { signal: controller.signal })
+      .then(setStats)
       .catch((err) => {
-        if (active) setError(err instanceof ApiError ? err.message : 'Statistika yüklənmədi.');
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Statistika yüklənmədi.');
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, []);
 
   if (loading) return <Spinner label="Admin statistikaları yüklənir..." />;
@@ -107,17 +104,13 @@ export function AdminOverviewPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to="/admin/applications">
-            <Button variant="primary" size="sm">
-              Müraciətlərə bax
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link to="/admin/courses">
-            <Button variant="outline" size="sm">
-              Kursları idarə et
-            </Button>
-          </Link>
+          <ButtonLink to="/admin/applications" variant="primary" size="sm">
+            Müraciətlərə bax
+            <ArrowRight className="h-4 w-4" />
+          </ButtonLink>
+          <ButtonLink to="/admin/courses" variant="outline" size="sm">
+            Kursları idarə et
+          </ButtonLink>
         </div>
       </div>
 
@@ -145,9 +138,9 @@ export function AdminOverviewPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle as="h2" className="flex items-center gap-2">
               <FileClock className="h-5 w-5 text-[#4338CA]" />
               Son İnzibati Fəaliyyətlər
             </CardTitle>
@@ -155,11 +148,9 @@ export function AdminOverviewPage() {
               Kritik admin əməliyyatları dəyişdirilməz audit jurnalında saxlanılır.
             </CardDescription>
           </div>
-          <Link to="/admin/audit-logs">
-            <Button variant="ghost" size="sm">
-              Hamısına bax
-            </Button>
-          </Link>
+          <ButtonLink to="/admin/audit-logs" variant="ghost" size="sm">
+            Hamısına bax
+          </ButtonLink>
         </CardHeader>
         <CardContent>
           {stats.recent_audit_logs.length === 0 ? (
@@ -171,9 +162,13 @@ export function AdminOverviewPage() {
                   key={log.id}
                   className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Badge variant="brand">{log.action}</Badge>
-                    <span className="text-zinc-700">{log.entity_type}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-[#18181B]">
+                      {formatAuditActionAz(log.action)}
+                    </span>
+                    <Badge variant="brand" className="font-mono text-[11px]">
+                      {log.action}
+                    </Badge>
                     {log.actor_email && (
                       <span className="text-xs text-zinc-500">({log.actor_email})</span>
                     )}

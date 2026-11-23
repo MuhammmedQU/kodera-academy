@@ -1,6 +1,6 @@
-import type { AuthSessionUser } from '../../src/shared/types/domain';
-import { getBearerToken, HttpError, type ApiRequest } from './http';
-import type { AuditContext, KoderaRepository } from './repository';
+import type { AuthSessionUser } from '../../src/shared/types/domain.js';
+import { getBearerToken, HttpError, type ApiRequest } from './http.js';
+import type { AuditContext, KoderaRepository } from './repository.js';
 
 /**
  * Resolves the current user strictly from the server-verified Authorization Bearer JWT.

@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { isIP } from 'node:net';
 import type { ZodError } from 'zod';
 
 const MAX_BODY_BYTES = 1_048_576; // 1 MB hard cap against payload DoS
@@ -28,15 +29,38 @@ export class HttpError extends Error {
   }
 }
 
+function normalizeCandidateIp(raw: string | undefined): string | null {
+  if (!raw) return null;
+  let candidate = raw.trim();
+  if (!candidate || candidate.length > 64) return null;
+  if (candidate.startsWith('::ffff:')) {
+    candidate = candidate.slice(7);
+  }
+  return isIP(candidate) !== 0 ? candidate : null;
+}
+
+export function sanitizeIpForDb(ip: string | null | undefined): string | null {
+  return normalizeCandidateIp(ip ?? undefined);
+}
+
 export function getClientIp(req: IncomingMessage): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0]?.trim() || '127.0.0.1';
+  // Prefer Vercel-verified platform headers when present; validate strictly with node:net isIP()
+  const platformHeaders = [
+    req.headers['x-vercel-forwarded-for'],
+    req.headers['x-real-ip'],
+    req.headers['x-forwarded-for'],
+  ];
+
+  for (const header of platformHeaders) {
+    const raw = Array.isArray(header) ? header[0] : header;
+    if (typeof raw === 'string' && raw.length > 0) {
+      const firstPart = raw.split(',')[0];
+      const valid = normalizeCandidateIp(firstPart);
+      if (valid) return valid;
+    }
   }
-  if (Array.isArray(forwarded) && forwarded[0]) {
-    return forwarded[0].split(',')[0]?.trim() || '127.0.0.1';
-  }
-  return req.socket?.remoteAddress || '127.0.0.1';
+
+  return normalizeCandidateIp(req.socket?.remoteAddress) ?? '127.0.0.1';
 }
 
 export function getBearerToken(headers: IncomingMessage['headers']): string | null {
@@ -48,11 +72,50 @@ export function getBearerToken(headers: IncomingMessage['headers']): string | nu
 }
 
 export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  // Vercel sometimes pre-parses req.body
-  const preParsed = (req as IncomingMessage & { body?: unknown }).body;
+  // Vercel Node runtime may expose req.body as a lazy getter that throws on invalid JSON
+  let preParsed: unknown;
+  try {
+    preParsed = (req as IncomingMessage & { body?: unknown }).body;
+  } catch {
+    throw new HttpError(400, 'INVALID_JSON', 'JSON formatı düzgün deyil.');
+  }
+
   if (preParsed !== undefined && preParsed !== null) {
+    if (Buffer.isBuffer(preParsed)) {
+      if (preParsed.byteLength > MAX_BODY_BYTES) {
+        throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Sorğu həcmi icazə verilən limiti aşır.');
+      }
+      const raw = preParsed.toString('utf8').trim();
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch {
+        throw new HttpError(400, 'INVALID_JSON', 'JSON formatı düzgün deyil.');
+      }
+    }
+
     if (typeof preParsed === 'string') {
-      return preParsed.length > 0 ? JSON.parse(preParsed) : {};
+      if (Buffer.byteLength(preParsed, 'utf8') > MAX_BODY_BYTES) {
+        throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Sorğu həcmi icazə verilən limiti aşır.');
+      }
+      const trimmed = preParsed.trim();
+      if (!trimmed) return {};
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        throw new HttpError(400, 'INVALID_JSON', 'JSON formatı düzgün deyil.');
+      }
+    }
+
+    // Object pre-parsed by Vercel runtime — still enforce our 1 MB byte cap
+    try {
+      const serializedSize = Buffer.byteLength(JSON.stringify(preParsed), 'utf8');
+      if (serializedSize > MAX_BODY_BYTES) {
+        throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Sorğu həcmi icazə verilən limiti aşır.');
+      }
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(400, 'INVALID_JSON', 'JSON formatı düzgün deyil.');
     }
     return preParsed;
   }
@@ -102,6 +165,17 @@ export async function parseApiRequest(req: IncomingMessage): Promise<ApiRequest>
   const method = (req.method || 'GET').toUpperCase();
   const rawUrl = req.url || '/';
   const parsedUrl = new URL(rawUrl, 'http://localhost');
+
+  // Reconstruct canonical pathname when Vercel rewrites /api/<domain>/:path* -> /api/<domain>?__route=:path*
+  let pathname = parsedUrl.pathname;
+  const rewrittenRoute = parsedUrl.searchParams.get('__route');
+  if (rewrittenRoute !== null) {
+    parsedUrl.searchParams.delete('__route');
+    const cleanBase = pathname.replace(/\/$/, '');
+    const cleanSuffix = rewrittenRoute.replace(/^\/+/, '');
+    pathname = cleanSuffix ? `${cleanBase}/${cleanSuffix}` : cleanBase;
+  }
+
   const shouldReadBody = !['GET', 'HEAD', 'OPTIONS'].includes(method);
   const body = shouldReadBody ? await readJsonBody(req) : undefined;
   const ua = req.headers['user-agent'];
@@ -109,7 +183,7 @@ export async function parseApiRequest(req: IncomingMessage): Promise<ApiRequest>
   return {
     method,
     url: rawUrl,
-    pathname: parsedUrl.pathname,
+    pathname,
     query: parsedUrl.searchParams,
     headers: req.headers,
     body,

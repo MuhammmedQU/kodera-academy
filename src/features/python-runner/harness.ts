@@ -37,7 +37,8 @@ export type WorkerOutboundMessage =
 /**
  * Pure Python harness script executed inside the isolated Pyodide Web Worker.
  * Captures stdout/stderr, mocks builtins.input from predefined test stdin lines,
- * enforces output truncation, and evaluates predefined test cases cleanly.
+ * enforces output truncation, separates student runtime errors from test assertion
+ * failures, and evaluates predefined test cases cleanly.
  */
 export const PYTHON_RUNNER_HARNESS = `
 import io
@@ -68,46 +69,65 @@ def _kodera_run(user_code, test_cases_json, max_output_chars):
             input_idx["i"] = i + 1
             return input_lines[i]
 
+        builtins_src = __builtins__.__dict__ if hasattr(__builtins__, "__dict__") else __builtins__
+        builtins_dict = dict(builtins_src)
+        orig_import = builtins_dict["__import__"]
+
+        def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+            root = (name or "").split(".")[0]
+            if root in ("js", "pyodide", "pyodide_js"):
+                raise ImportError(f"'{name}' modulu öyrənmə mühitində məhdudlaşdırılıb.")
+            return orig_import(name, globals, locals, fromlist, level)
+
+        builtins_dict["input"] = _fake_input
+        builtins_dict["__import__"] = _safe_import
+
         safe_globals = {
             "__name__": "__main__",
-            "__builtins__": __builtins__,
+            "__builtins__": builtins_dict,
         }
-        # Override input safely inside a shallow copy of builtins
-        builtins_dict = dict(__builtins__.__dict__) if hasattr(__builtins__, "__dict__") else dict(__builtins__)
-        builtins_dict["input"] = _fake_input
-        safe_globals["__builtins__"] = builtins_dict
 
-        err_msg = None
+        runtime_err = None
+        assertion_err = None
+
         with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
             try:
                 compiled = compile(user_code, "<student_code.py>", "exec")
                 exec(compiled, safe_globals)
-                if assertion_code:
-                    assert_compiled = compile(assertion_code, "<test_assertion.py>", "exec")
-                    exec(assert_compiled, safe_globals)
             except BaseException as exc:
                 tb_lines = traceback.format_exception(type(exc), exc, exc.__traceback__)
-                # Keep traceback concise and student-friendly
-                err_msg = "".join(tb_lines[-3:]).strip()
+                runtime_err = "".join(tb_lines[-3:]).strip()
+
+            if runtime_err is None and assertion_code:
+                try:
+                    assert_compiled = compile(assertion_code, "<test_assertion.py>", "exec")
+                    exec(assert_compiled, safe_globals)
+                except AssertionError as exc:
+                    detail = str(exc).strip()
+                    assertion_err = detail if detail else "Kodun nəticəsi gözlənilən test şərtinə uyğun gəlmədi."
+                except BaseException as exc:
+                    assertion_err = f"{type(exc).__name__}: {exc}"
 
         out = stdout_buf.getvalue()
         if len(out) > max_output_chars:
             out = out[:max_output_chars] + "\\n...[çıxış limiti aşıldı, kəsildi]"
+
         err = stderr_buf.getvalue()
-        if err_msg:
-            err = (err + "\\n" + err_msg).strip() if err else err_msg
+        if runtime_err:
+            err = (err + "\\n" + runtime_err).strip() if err else runtime_err
         if len(err) > max_output_chars:
             err = err[:max_output_chars] + "\\n...[xəta çıxışı kəsildi]"
-        return out, err
+
+        return out, err, assertion_err
 
     if not test_cases:
-        out, err = _exec_single("", None)
+        out, err, _ = _exec_single("", None)
         primary_stdout = out
         primary_stderr = err
         had_runtime_error = bool(err)
     else:
         for idx, tc in enumerate(test_cases):
-            out, err = _exec_single(tc.get("stdin_input") or "", tc.get("assertion_code"))
+            out, err, assert_err = _exec_single(tc.get("stdin_input") or "", tc.get("assertion_code"))
             if idx == 0:
                 primary_stdout = out
                 primary_stderr = err
@@ -119,6 +139,16 @@ def _kodera_run(user_code, test_cases_json, max_output_chars):
                     "expected": tc.get("expected_stdout"),
                     "actual": out.strip(),
                     "error": err,
+                })
+                continue
+
+            if assert_err:
+                results.append({
+                    "label": tc["label"],
+                    "passed": False,
+                    "expected": tc.get("expected_stdout"),
+                    "actual": out.strip(),
+                    "error": assert_err,
                 })
                 continue
 

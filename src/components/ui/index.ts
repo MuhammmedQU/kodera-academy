@@ -1,8 +1,8 @@
 export { Alert } from './Alert';
 export { Badge } from './Badge';
 export { BrandLogo } from './BrandLogo';
-export { Button } from './Button';
-export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './Card';
+export { Button, ButtonLink, buttonVariants } from './Button';
+export { Card, CardContent, CardDescription, CardHeader, CardTitle } from './Card';
 export { EmptyState } from './EmptyState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { Input } from './Input';

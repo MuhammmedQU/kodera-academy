@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,16 +15,60 @@ import {
   Input,
 } from '@/components/ui';
 import { useAuth } from '@/app/AuthContext';
+import { usePlatformSettings } from '@/app/SettingsContext';
 import { ApiError } from '@/lib/apiClient';
 import { clientEnv } from '@/lib/env';
 
+function parseAuthRedirectNotice(search: string, hash: string): {
+  type: 'success' | 'error';
+  message: string;
+} | null {
+  const searchParams = new URLSearchParams(search);
+  const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+  const errorCode = hashParams.get('error_code') || searchParams.get('error_code');
+  const error = hashParams.get('error') || searchParams.get('error');
+
+  if (errorCode === 'otp_expired' || error === 'access_denied') {
+    return {
+      type: 'error',
+      message: 'Email təsdiq linkinin vaxtı bitib və ya etibarsızdır. Yenidən giriş və ya təsdiq linki istəyin.',
+    };
+  }
+  if (error) {
+    return {
+      type: 'error',
+      message: 'Autentifikasiya bağlantısı emal olunmadı. Zəhmət olmasa yenidən cəhd edin.',
+    };
+  }
+  if (searchParams.get('verified') === '1' || hashParams.get('type') === 'signup') {
+    return {
+      type: 'success',
+      message: 'Email ünvanınız uğurla təsdiqləndi! Hesabınıza daxil ola bilərsiniz.',
+    };
+  }
+  return null;
+}
+
 export function LoginPage() {
-  const { login } = useAuth();
+  const { user, isLoading, login } = useAuth();
+  const { settings } = usePlatformSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [serverError, setServerError] = useState<string | null>(null);
 
   const from = (location.state as { from?: string } | null)?.from;
+  const redirectNotice = parseAuthRedirectNotice(location.search, location.hash);
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+    if (user.isAdmin) {
+      navigate(from?.startsWith('/admin') ? from : '/admin', { replace: true });
+    } else if (user.isActiveStudent) {
+      navigate(from?.startsWith('/dashboard') ? from : '/dashboard', { replace: true });
+    } else {
+      navigate('/application-status', { replace: true });
+    }
+  }, [user, isLoading, from, navigate]);
 
   const {
     register,
@@ -39,10 +83,10 @@ export function LoginPage() {
   const onSubmit = async (values: LoginInput) => {
     setServerError(null);
     try {
-      const user = await login(values);
-      if (user.isAdmin) {
+      const signedIn = await login(values);
+      if (signedIn.isAdmin) {
         navigate(from?.startsWith('/admin') ? from : '/admin', { replace: true });
-      } else if (user.isActiveStudent) {
+      } else if (signedIn.isActiveStudent) {
         navigate(from?.startsWith('/dashboard') ? from : '/dashboard', { replace: true });
       } else {
         navigate('/application-status', { replace: true });
@@ -67,13 +111,18 @@ export function LoginPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h2" className="flex items-center gap-2">
             <LogIn className="h-5 w-5 text-[#4338CA]" />
             Daxil ol
           </CardTitle>
           <CardDescription>Qeydiyyatdan keçdiyiniz email və şifrəni daxil edin.</CardDescription>
         </CardHeader>
         <CardContent>
+          {redirectNotice && (
+            <Alert variant={redirectNotice.type} className="mb-4">
+              {redirectNotice.message}
+            </Alert>
+          )}
           {serverError && (
             <Alert variant="error" className="mb-4">
               {serverError}
@@ -116,7 +165,7 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {clientEnv.isLocalSandbox && (
+          {import.meta.env.DEV && clientEnv.isLocalSandbox && (
             <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-950">
               <p className="font-semibold">Lokal Sandbox Test Hesabları (yalnız dev rejimi):</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -154,12 +203,14 @@ export function LoginPage() {
             </div>
           )}
 
-          <p className="mt-6 text-center text-sm text-zinc-600">
-            Hesabınız yoxdur?{' '}
-            <Link to="/register" className="font-semibold text-[#4338CA] hover:underline">
-              Qeydiyyat müraciəti et
-            </Link>
-          </p>
+          {settings.registration_enabled && (
+            <p className="mt-6 text-center text-sm text-zinc-600">
+              Hesabınız yoxdur?{' '}
+              <Link to="/register" className="font-semibold text-[#4338CA] hover:underline">
+                Qeydiyyat müraciəti et
+              </Link>
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

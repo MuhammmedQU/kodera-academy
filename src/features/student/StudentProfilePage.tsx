@@ -1,5 +1,9 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Save } from 'lucide-react';
+import type { z } from 'zod';
+import { profileUpdateSchema } from '@shared/validation/schemas';
 import {
   Alert,
   Badge,
@@ -16,35 +20,43 @@ import { useAuth } from '@/app/AuthContext';
 import { apiRequest, ApiError } from '@/lib/apiClient';
 import { formatAccountStatusAz } from '@/lib/formatters';
 
+type ProfileFormInput = z.input<typeof profileUpdateSchema>;
+type ProfileFormOutput = z.infer<typeof profileUpdateSchema>;
+
 export function StudentProfilePage() {
   const { user, refreshUser } = useAuth();
-  const [fullName, setFullName] = useState(user?.profile.full_name ?? '');
-  const [phone, setPhone] = useState(user?.profile.phone ?? '');
-  const [goals, setGoals] = useState(user?.profile.learning_goals ?? '');
-  const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileFormInput, unknown, ProfileFormOutput>({
+    resolver: zodResolver(profileUpdateSchema),
+    values: {
+      full_name: user?.profile.full_name ?? '',
+      phone: user?.profile.phone ?? '',
+      learning_goals: user?.profile.learning_goals ?? '',
+    },
+  });
+
+  const onSubmit = async (values: ProfileFormOutput) => {
     setError(null);
     setFeedback(null);
     try {
       await apiRequest('/api/student/profile', {
         method: 'PATCH',
         body: {
-          full_name: fullName,
-          phone: phone || null,
-          learning_goals: goals || null,
+          full_name: values.full_name,
+          phone: values.phone ?? null,
+          learning_goals: values.learning_goals ?? null,
         },
       });
       await refreshUser();
       setFeedback('Profil məlumatlarınız yeniləndi.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Profil yenilənmədi.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -62,8 +74,8 @@ export function StudentProfilePage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle>Hesab məlumatları</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle as="h2">Hesab məlumatları</CardTitle>
             {user && (
               <Badge variant="success">{formatAccountStatusAz(user.profile.account_status)}</Badge>
             )}
@@ -74,25 +86,29 @@ export function StudentProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Input
               label="Ad və soyad"
               required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="name"
+              error={errors.full_name?.message}
+              {...register('full_name')}
             />
             <Input
               label="Telefon nömrəsi"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="tel"
+              autoComplete="tel"
+              placeholder="+994 50 123 45 67"
+              error={errors.phone?.message}
+              {...register('phone')}
             />
             <Textarea
               label="Öyrənmə məqsədi"
               rows={3}
-              value={goals}
-              onChange={(e) => setGoals(e.target.value)}
+              error={errors.learning_goals?.message}
+              {...register('learning_goals')}
             />
-            <Button type="submit" variant="primary" isLoading={saving}>
+            <Button type="submit" variant="primary" isLoading={isSubmitting}>
               <Save className="h-4 w-4" />
               Dəyişiklikləri yadda saxla
             </Button>

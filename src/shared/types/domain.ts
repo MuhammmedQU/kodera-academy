@@ -112,6 +112,7 @@ export interface Course {
   public_module_count?: number;
   total_module_count?: number;
   total_lesson_count?: number;
+  first_public_lesson_slug?: string | null;
 }
 
 export interface ModuleItem {
@@ -281,6 +282,7 @@ export interface ExerciseAttemptSummary {
   id: string;
   student_id: string;
   exercise_id: string;
+  exercise_title?: string;
   submitted_code: string;
   status: AttemptStatus;
   passed_tests: number;
@@ -333,8 +335,8 @@ export interface LessonViewPayload {
   module: ModuleItem;
   lesson: LessonItem;
   blocks: LessonContentBlock[];
-  prev_lesson: { slug: string; title: string; is_locked: boolean } | null;
-  next_lesson: { slug: string; title: string; is_locked: boolean } | null;
+  prev_lesson: { slug: string | null; title: string; is_locked: boolean } | null;
+  next_lesson: { slug: string | null; title: string; is_locked: boolean } | null;
   is_last_public_lesson: boolean;
   is_enrolled: boolean;
   progress_status: ProgressStatus;

@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { AlertTriangle, BookMarked, CheckCircle2, Info, Sparkles } from 'lucide-react';
 import type {
   ExerciseAttemptSummary,
@@ -10,15 +10,20 @@ import type {
 import { CodeBlock } from './CodeBlock';
 import { ExerciseBlock, type PythonRunOutcome } from './ExerciseBlock';
 import { QuizBlock } from './QuizBlock';
-import { isSafeUrl } from '@/lib/formatters';
+import { isSafeImageUrl } from '@/lib/formatters';
 
 interface LessonContentRendererProps {
   blocks: LessonContentBlock[];
   canTrackStudentActions: boolean;
   previousQuizAttempts?: Record<string, QuizAttemptSummary[]>;
   previousExerciseAttempts?: Record<string, ExerciseAttemptSummary[]>;
-  onRunPython?: (code: string, exercise: PublicExercise) => Promise<PythonRunOutcome>;
+  onRunPython?: (
+    code: string,
+    exercise: PublicExercise,
+    onStatus?: (stage: string) => void,
+  ) => Promise<PythonRunOutcome>;
   onQuizSubmitted?: (quizId: string, result: QuizAttemptResult) => void;
+  onExerciseAttemptSaved?: (exerciseId: string, attempt: ExerciseAttemptSummary) => void;
 }
 
 /**
@@ -45,6 +50,31 @@ function RichInlineText({ text }: { text: string }) {
   );
 }
 
+function SafeLessonImage({ url, alt, caption }: { url: string; alt: string; caption?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <figure className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 text-center text-xs text-zinc-500">
+        Şəkil yüklənə bilmədi ({alt}).
+      </figure>
+    );
+  }
+  return (
+    <figure className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3">
+      <img
+        src={url}
+        alt={alt}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="mx-auto max-h-[420px] w-full rounded-xl object-contain"
+      />
+      {caption && (
+        <figcaption className="mt-2.5 text-center text-xs text-zinc-500">{caption}</figcaption>
+      )}
+    </figure>
+  );
+}
+
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
@@ -60,6 +90,7 @@ export function LessonContentRenderer({
   previousExerciseAttempts = {},
   onRunPython,
   onQuizSubmitted,
+  onExerciseAttemptSaved,
 }: LessonContentRendererProps) {
   return (
     <div className="space-y-6">
@@ -90,7 +121,10 @@ export function LessonContentRenderer({
           case 'paragraph': {
             const text = asString(c.text);
             return (
-              <p key={block.id} className="text-base leading-relaxed text-zinc-700">
+              <p
+                key={block.id}
+                className="whitespace-pre-line text-base leading-relaxed text-zinc-700"
+              >
                 <RichInlineText text={text} />
               </p>
             );
@@ -100,25 +134,8 @@ export function LessonContentRenderer({
             const url = asString(c.url || c.storage_path);
             const alt = asString(c.alt, block.title ?? 'Dərs illüstrasiyası');
             const caption = asString(c.caption);
-            if (!isSafeUrl(url)) return null;
-            return (
-              <figure
-                key={block.id}
-                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3"
-              >
-                <img
-                  src={url}
-                  alt={alt}
-                  loading="lazy"
-                  className="mx-auto max-h-[420px] w-full rounded-xl object-contain"
-                />
-                {caption && (
-                  <figcaption className="mt-2.5 text-center text-xs text-zinc-500">
-                    {caption}
-                  </figcaption>
-                )}
-              </figure>
-            );
+            if (!isSafeImageUrl(url)) return null;
+            return <SafeLessonImage key={block.id} url={url} alt={alt} caption={caption} />;
           }
 
           case 'code': {
@@ -153,7 +170,7 @@ export function LessonContentRenderer({
                   {block.title || 'Bu kod necə işləyir?'}
                 </div>
                 {text && (
-                  <p className="text-sm leading-relaxed text-zinc-800">
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-800">
                     <RichInlineText text={text} />
                   </p>
                 )}
@@ -192,7 +209,7 @@ export function LessonContentRenderer({
                   {block.title || 'Real Həyat Nümunəsi'}
                 </div>
                 {scenario && (
-                  <p className="text-sm leading-relaxed text-zinc-700">
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-700">
                     <RichInlineText text={scenario} />
                   </p>
                 )}
@@ -204,7 +221,7 @@ export function LessonContentRenderer({
                   />
                 )}
                 {walkthrough && (
-                  <p className="text-sm leading-relaxed text-zinc-600">
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-600">
                     <RichInlineText text={walkthrough} />
                   </p>
                 )}
@@ -221,7 +238,7 @@ export function LessonContentRenderer({
                 <Info className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" />
                 <div className="space-y-1">
                   <p className="font-semibold">{block.title || 'Vacib qeyd'}</p>
-                  <p className="leading-relaxed">
+                  <p className="whitespace-pre-line leading-relaxed">
                     <RichInlineText text={asString(c.text)} />
                   </p>
                 </div>
@@ -237,9 +254,9 @@ export function LessonContentRenderer({
                 className="flex gap-3 rounded-2xl border border-[#F59E0B]/45 bg-[#FEF3C7]/65 p-4 text-sm text-[#78350F]"
               >
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#D97706]" />
-                <div className="space-y-1.5">
+                <div className="min-w-0 flex-1 space-y-1.5">
                   <p className="font-bold">{block.title || 'Diqqət: Tez-tez edilən xəta'}</p>
-                  <p className="leading-relaxed">
+                  <p className="whitespace-pre-line leading-relaxed">
                     <RichInlineText text={asString(c.text)} />
                   </p>
                   {commonMistake && (
@@ -261,6 +278,9 @@ export function LessonContentRenderer({
                 canSaveAttempt={canTrackStudentActions}
                 previousAttempts={previousExerciseAttempts[block.exercise.id]}
                 onRunPython={onRunPython}
+                onAttemptSaved={(attempt) =>
+                  onExerciseAttemptSaved?.(block.exercise!.id, attempt)
+                }
               />
             );
           }

@@ -3,10 +3,11 @@ import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
-} from '../../src/shared/validation/schemas';
-import { requireAuthenticated } from '../lib/auth';
-import { HttpError, sendJson, type ApiRequest } from '../lib/http';
-import type { KoderaRepository } from '../lib/repository';
+  resendVerificationSchema,
+} from '../../src/shared/validation/schemas.js';
+import { requireAuthenticated } from '../lib/auth.js';
+import { getBearerToken, HttpError, sendJson, type ApiRequest } from '../lib/http.js';
+import type { KoderaRepository } from '../lib/repository.js';
 
 export async function handleAuthRoute(
   req: ApiRequest,
@@ -77,10 +78,20 @@ export async function handleAuthRoute(
     return;
   }
 
-  // POST /api/auth/forgot-password (neutral response prevents account enumeration)
+  // POST /api/auth/logout (revokes sandbox token when active; safe no-op otherwise)
+  if (req.method === 'POST' && subPath === 'logout') {
+    const token = getBearerToken(req.headers);
+    if (token && repo.logoutSandbox) {
+      await repo.logoutSandbox(token);
+    }
+    sendJson(res, 200, { logged_out: true });
+    return;
+  }
+
+  // POST /api/auth/forgot-password (neutral response + IP & per-email rate limiting)
   if (req.method === 'POST' && subPath === 'forgot-password') {
-    const allowed = await repo.checkRateLimit(`reset:ip:${req.ip}`, 'password_reset', 900, 5);
-    if (!allowed) {
+    const allowedByIp = await repo.checkRateLimit(`reset:ip:${req.ip}`, 'password_reset', 900, 5);
+    if (!allowedByIp) {
       throw new HttpError(
         429,
         'RATE_LIMIT_EXCEEDED',
@@ -88,10 +99,60 @@ export async function handleAuthRoute(
       );
     }
     const input = forgotPasswordSchema.parse(req.body);
+    const allowedByEmail = await repo.checkRateLimit(
+      `reset:email:${input.email}`,
+      'password_reset',
+      900,
+      3,
+    );
+    if (!allowedByEmail) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Bu email ünvanı üçün çox sayda bərpa sorğusu göndərildi. Bir az sonra yenidən yoxlayın.',
+      );
+    }
     await repo.requestPasswordReset(input.email);
     sendJson(res, 200, {
       message:
         'Əgər bu email ünvanı sistemdə mövcuddursa, şifrə bərpa təlimatı emailinizə göndərildi.',
+    });
+    return;
+  }
+
+  // POST /api/auth/resend-verification (neutral response + IP & per-email rate limiting)
+  if (req.method === 'POST' && subPath === 'resend-verification') {
+    const allowedByIp = await repo.checkRateLimit(
+      `verify:ip:${req.ip}`,
+      'resend_verification',
+      900,
+      5,
+    );
+    if (!allowedByIp) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Çox sayda təsdiq sorğusu göndərildi. Bir az sonra yenidən cəhd edin.',
+      );
+    }
+    const input = resendVerificationSchema.parse(req.body);
+    const allowedByEmail = await repo.checkRateLimit(
+      `verify:email:${input.email}`,
+      'resend_verification',
+      900,
+      3,
+    );
+    if (!allowedByEmail) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Bu email ünvanı üçün çox sayda təsdiq linki istəndi. Bir az sonra yenidən yoxlayın.',
+      );
+    }
+    await repo.resendVerificationEmail(input.email);
+    sendJson(res, 200, {
+      message:
+        'Əgər bu email ünvanı hələ təsdiqlənməyibsə, yeni təsdiq linki emailinizə göndərildi.',
     });
     return;
   }

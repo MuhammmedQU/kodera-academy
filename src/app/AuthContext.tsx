@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { AuthSessionUser } from '@shared/types/domain';
 import type { LoginInput, RegisterInput } from '@shared/validation/schemas';
 import { apiRequest, getSandboxToken, setSandboxToken } from '@/lib/apiClient';
@@ -15,6 +23,8 @@ interface AuthContextValue {
   user: AuthSessionUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  justLoggedOut: boolean;
+  acknowledgeLogout: () => void;
   refreshUser: () => Promise<AuthSessionUser | null>;
   login: (input: LoginInput) => Promise<AuthSessionUser>;
   register: (input: RegisterInput) => Promise<RegisterResult>;
@@ -23,44 +33,86 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isPasswordRecoveryUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.location.pathname === '/reset-password' &&
+    (window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('type=recovery') ||
+      window.location.search.includes('code='))
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthSessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [justLoggedOut, setJustLoggedOut] = useState(false);
+  const inFlightRefresh = useRef<Promise<AuthSessionUser | null> | null>(null);
+
+  const acknowledgeLogout = useCallback(() => {
+    setJustLoggedOut(false);
+  }, []);
 
   const refreshUser = useCallback(async (): Promise<AuthSessionUser | null> => {
-    const supabase = getSupabaseClient();
-    const hasToken = supabase
-      ? Boolean((await supabase.auth.getSession()).data.session?.access_token)
-      : Boolean(getSandboxToken());
-
-    if (!hasToken) {
-      setUser(null);
-      setIsLoading(false);
-      return null;
+    if (inFlightRefresh.current) {
+      return inFlightRefresh.current;
     }
 
-    try {
-      const me = await apiRequest<AuthSessionUser>('/api/auth/me', { auth: true });
-      setUser(me);
-      return me;
-    } catch {
-      setUser(null);
-      if (clientEnv.isLocalSandbox) {
-        setSandboxToken(null);
+    const promise = (async () => {
+      if (isPasswordRecoveryUrl()) {
+        setUser(null);
+        setIsLoading(false);
+        return null;
       }
-      return null;
+
+      const supabase = getSupabaseClient();
+      const hasToken = supabase
+        ? Boolean((await supabase.auth.getSession()).data.session?.access_token)
+        : Boolean(getSandboxToken());
+
+      if (!hasToken) {
+        setUser(null);
+        setIsLoading(false);
+        return null;
+      }
+
+      try {
+        const me = await apiRequest<AuthSessionUser>('/api/auth/me', { auth: true });
+        setUser(me);
+        return me;
+      } catch {
+        setUser(null);
+        if (clientEnv.isLocalSandbox) {
+          setSandboxToken(null);
+        }
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+
+    inFlightRefresh.current = promise;
+    try {
+      return await promise;
     } finally {
-      setIsLoading(false);
+      inFlightRefresh.current = null;
     }
   }, []);
 
   useEffect(() => {
-    void refreshUser();
-
     const supabase = getSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      void refreshUser();
+      return;
+    }
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // Never promote a PASSWORD_RECOVERY link session into normal authenticated navigation
+      if (event === 'PASSWORD_RECOVERY') {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
       if (!session) {
         setUser(null);
         setIsLoading(false);
@@ -83,6 +135,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: input.password,
         });
         if (error) {
+          const msg = error.message.toLowerCase();
+          if (msg.includes('email not confirmed')) {
+            throw new Error(
+              'Email ünvanınız hələ təsdiqlənməyib. Zəhmət olmasa email qutunuzdakı təsdiq linkinə klikləyin.',
+            );
+          }
+          if (msg.includes('too many requests') || msg.includes('rate limit')) {
+            throw new Error('Çox sayda giriş cəhdi edildi. Bir az sonra yenidən yoxlayın.');
+          }
           throw new Error('Email və ya şifrə yanlışdır.');
         }
         const me = await refreshUser();
@@ -156,14 +217,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+    const token = clientEnv.isLocalSandbox ? getSandboxToken() : null;
+    setJustLoggedOut(true);
+    setUser(null);
     if (clientEnv.isLocalSandbox) {
       setSandboxToken(null);
     }
-    setUser(null);
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.auth.signOut().catch(() => {});
+    }
+    if (token) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
   }, []);
 
   return (
@@ -172,6 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: Boolean(user),
+        justLoggedOut,
+        acknowledgeLogout,
         refreshUser,
         login,
         register,

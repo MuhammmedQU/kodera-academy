@@ -11,6 +11,10 @@ max_rows = 500
 [db]
 major_version = 15
 
+[db.seed]
+enabled = true
+sql_paths = ["./seeds/01_python_intro_modules.sql"]
+
 [auth]
 enabled = true
 site_url = "http://localhost:5173"

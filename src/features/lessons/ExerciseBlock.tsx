@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ChevronDown, ChevronUp, Code2, Lightbulb, Play, RotateCcw, Square } from 'lucide-react';
 import type { ExerciseAttemptSummary, PublicExercise } from '@shared/types/domain';
 import {
@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui';
-import { apiRequest } from '@/lib/apiClient';
+import { apiRequest, ApiError } from '@/lib/apiClient';
 import { resetSharedPythonRunner } from '@/features/python-runner/pythonRunner';
 
 export interface PythonRunOutcome {
@@ -19,6 +19,7 @@ export interface PythonRunOutcome {
   stdout: string;
   stderr: string;
   executionTimeMs: number;
+  cancelled?: boolean;
   testResults: Array<{
     label: string;
     passed: boolean;
@@ -35,6 +36,7 @@ interface ExerciseBlockProps {
   onRunPython?: (
     code: string,
     exercise: PublicExercise,
+    onStatus?: (stage: string) => void,
   ) => Promise<PythonRunOutcome>;
   onAttemptSaved?: (attempt: ExerciseAttemptSummary) => void;
 }
@@ -49,18 +51,59 @@ export function ExerciseBlock({
   const [code, setCode] = useState(exercise.starter_code);
   const [showHints, setShowHints] = useState(false);
   const [running, setRunning] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>('Python icra olunur...');
   const [outcome, setOutcome] = useState<PythonRunOutcome | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+  const runningRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (runningRef.current) {
+        resetSharedPythonRunner();
+      }
+    };
+  }, []);
 
   const handleRun = async () => {
     if (!onRunPython) return;
+    runningRef.current = true;
     setRunning(true);
+    setLoadingStage('Python icra olunur...');
     setSaveMessage(null);
-    try {
-      const res = await onRunPython(code, exercise);
-      setOutcome(res);
+    setSaveError(null);
 
-      if (canSaveAttempt) {
+    let res: PythonRunOutcome;
+    try {
+      res = await onRunPython(code, exercise, (stage) => {
+        if (mountedRef.current) setLoadingStage(stage);
+      });
+    } catch (err) {
+      if (!mountedRef.current) return;
+      runningRef.current = false;
+      setRunning(false);
+      setOutcome({
+        status: 'error',
+        stdout: '',
+        stderr: err instanceof Error ? err.message : 'İcra zamanı xəta baş verdi.',
+        executionTimeMs: 0,
+        testResults: [],
+      });
+      return;
+    }
+
+    if (!mountedRef.current) return;
+    runningRef.current = false;
+    setRunning(false);
+    setOutcome(res);
+
+    // Never save cancelled runs; save errors are isolated so passed output is never erased
+    if (canSaveAttempt && !res.cancelled) {
+      try {
         const passedTests = res.testResults.filter((t) => t.passed).length;
         const saved = await apiRequest<ExerciseAttemptSummary>(
           `/api/student/exercises/${exercise.id}/attempts`,
@@ -78,19 +121,19 @@ export function ExerciseBlock({
             },
           },
         );
-        setSaveMessage('Cəhdiniz irəliləyiş tarixçənizə yazıldı.');
-        onAttemptSaved?.(saved);
+        if (mountedRef.current) {
+          setSaveMessage('Cəhdiniz irəliləyiş tarixçənizə yazıldı.');
+          onAttemptSaved?.(saved);
+        }
+      } catch (err) {
+        if (mountedRef.current) {
+          setSaveError(
+            err instanceof ApiError
+              ? `Nəticə hesablandı, lakin tarixçəyə yazılmadı: ${err.message}`
+              : 'Nəticə hesablandı, lakin server tarixçəsinə yazıla bilmədi.',
+          );
+        }
       }
-    } catch (err) {
-      setOutcome({
-        status: 'error',
-        stdout: '',
-        stderr: err instanceof Error ? err.message : 'İcra zamanı xəta baş verdi.',
-        executionTimeMs: 0,
-        testResults: [],
-      });
-    } finally {
-      setRunning(false);
     }
   };
 
@@ -111,14 +154,6 @@ export function ExerciseBlock({
 
   const handleStop = () => {
     resetSharedPythonRunner();
-    setRunning(false);
-    setOutcome({
-      status: 'timeout',
-      stdout: '',
-      stderr: 'İcra istifadəçi tərəfindən dayandırıldı.',
-      executionTimeMs: 0,
-      testResults: [],
-    });
   };
 
   return (
@@ -134,12 +169,12 @@ export function ExerciseBlock({
             <Badge variant="neutral">Limit: {(exercise.time_limit_ms / 1000).toFixed(1)}s</Badge>
           </div>
         </div>
-        <CardDescription className="text-zinc-300">{exercise.instructions}</CardDescription>
+        <CardDescription className="text-zinc-200">{exercise.instructions}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4 pt-5">
         <div>
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <label
               htmlFor={`ex-editor-${exercise.id}`}
               className="text-xs font-semibold text-zinc-600 uppercase"
@@ -151,8 +186,10 @@ export function ExerciseBlock({
               onClick={() => {
                 setCode(exercise.starter_code);
                 setOutcome(null);
+                setSaveMessage(null);
+                setSaveError(null);
               }}
-              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-[#18181B]"
+              className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-zinc-500 hover:text-[#18181B]"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Sıfırla
@@ -181,7 +218,7 @@ export function ExerciseBlock({
               <>
                 <Button variant="primary" isLoading={running} onClick={handleRun}>
                   <Play className="h-4 w-4" />
-                  {running ? 'Python icra olunur...' : 'Kodu işə sal və yoxla'}
+                  {running ? loadingStage : 'Kodu işə sal və yoxla'}
                 </Button>
                 {running && (
                   <Button variant="danger" size="sm" onClick={handleStop}>
@@ -241,7 +278,9 @@ export function ExerciseBlock({
                 {outcome.status === 'passed'
                   ? 'Bütün testlər keçdi!'
                   : outcome.status === 'timeout'
-                    ? 'İcra vaxtı bitdi (Timeout)'
+                    ? outcome.cancelled
+                      ? 'İcra dayandırıldı'
+                      : 'İcra vaxtı bitdi'
                     : outcome.status === 'error'
                       ? 'İcra xətası'
                       : 'Bəzi testlər keçmədi'}
@@ -251,7 +290,7 @@ export function ExerciseBlock({
 
             {outcome.stdout && (
               <div>
-                <p className="mb-1 text-xs font-semibold text-zinc-500 uppercase">Çıxış (stdout)</p>
+                <p className="mb-1 text-xs font-semibold text-zinc-500 uppercase">Çıxış</p>
                 <pre className="overflow-x-auto rounded-lg bg-[#18181B] p-3 font-mono text-xs text-emerald-300">
                   {outcome.stdout}
                 </pre>
@@ -260,7 +299,7 @@ export function ExerciseBlock({
 
             {outcome.stderr && (
               <div>
-                <p className="mb-1 text-xs font-semibold text-red-600 uppercase">Xəta (stderr)</p>
+                <p className="mb-1 text-xs font-semibold text-red-600 uppercase">Xəta çıxışı</p>
                 <pre className="overflow-x-auto rounded-lg bg-red-950 p-3 font-mono text-xs text-red-200">
                   {outcome.stderr}
                 </pre>
@@ -295,6 +334,7 @@ export function ExerciseBlock({
             )}
 
             {saveMessage && <p className="text-xs font-medium text-emerald-700">{saveMessage}</p>}
+            {saveError && <Alert variant="warning">{saveError}</Alert>}
           </div>
         )}
 

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, Clock, Layers } from 'lucide-react';
 import type { Course } from '@shared/types/domain';
 import {
   Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -25,10 +24,17 @@ export function CoursesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiRequest<Course[]>('/api/public/courses', { auth: false })
+    const controller = new AbortController();
+    apiRequest<Course[]>('/api/public/courses', { auth: false, signal: controller.signal })
       .then(setCourses)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   const filtered = courses.filter((c) => {
@@ -93,7 +99,9 @@ export function CoursesPage() {
                     </Badge>
                   )}
                 </div>
-                <CardTitle className="mt-2 text-xl">{course.title}</CardTitle>
+                <CardTitle as="h2" className="mt-2 text-xl">
+                  {course.title}
+                </CardTitle>
                 <CardDescription className="leading-relaxed">
                   {course.subtitle || course.description}
                 </CardDescription>
@@ -112,12 +120,10 @@ export function CoursesPage() {
                     {formatDurationAz(course.estimated_duration_minutes)}
                   </span>
                 </div>
-                <Link to={`/courses/${course.slug}`}>
-                  <Button variant="primary" className="w-full">
-                    Detallara və kurikuluma bax
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
+                <ButtonLink to={`/courses/${course.slug}`} variant="primary" className="w-full">
+                  Detallara və kurikuluma bax
+                  <ArrowRight className="h-4 w-4" />
+                </ButtonLink>
               </CardContent>
             </Card>
           ))}

@@ -17,7 +17,6 @@ interface PyodideInstance {
 const PYODIDE_INDEX_URL = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/';
 
 let pyodidePromise: Promise<PyodideInstance> | null = null;
-let pyodideReady = false;
 
 function post(msg: WorkerOutboundMessage): void {
   self.postMessage(msg);
@@ -27,16 +26,19 @@ async function getPyodide(): Promise<PyodideInstance> {
   if (!pyodidePromise) {
     post({ type: 'loading', stage: 'Python WebAssembly mühiti yüklənir...' });
     pyodidePromise = (async () => {
-      const mod = (await import(
-        /* @vite-ignore */ `${PYODIDE_INDEX_URL}pyodide.mjs`
-      )) as {
-        loadPyodide: (opts: { indexURL: string }) => Promise<PyodideInstance>;
-      };
-      const instance = await mod.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
-      await instance.runPythonAsync(PYTHON_RUNNER_HARNESS);
-      pyodideReady = true;
-      post({ type: 'ready' });
-      return instance;
+      try {
+        const mod = (await import(
+          /* @vite-ignore */ `${PYODIDE_INDEX_URL}pyodide.mjs`
+        )) as {
+          loadPyodide: (opts: { indexURL: string }) => Promise<PyodideInstance>;
+        };
+        const instance = await mod.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+        await instance.runPythonAsync(PYTHON_RUNNER_HARNESS);
+        return instance;
+      } catch (err) {
+        pyodidePromise = null;
+        throw err;
+      }
     })();
   }
   return pyodidePromise;
@@ -46,12 +48,24 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRunRequest>) =
   const req = event.data;
   if (!req || !req.id) return;
 
+  let pyodide: PyodideInstance;
   try {
-    const pyodide = await getPyodide();
-    if (pyodideReady) {
-      post({ type: 'ready' });
-    }
+    pyodide = await getPyodide();
+  } catch (err) {
+    post({
+      type: 'init_error',
+      id: req.id,
+      message:
+        err instanceof Error
+          ? `Python mühiti işə salına bilmədi: ${err.message}`
+          : 'Python mühiti yüklənərkən xəta baş verdi.',
+    });
+    return;
+  }
 
+  post({ type: 'ready' });
+
+  try {
     const start = performance.now();
     pyodide.globals.set('_kodera_user_code', req.code);
     pyodide.globals.set('_kodera_test_cases_json', JSON.stringify(req.testCases));
@@ -85,15 +99,17 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRunRequest>) =
       testResults: parsed.testResults,
     });
   } catch (err) {
-    pyodidePromise = null;
-    pyodideReady = false;
     post({
-      type: 'init_error',
+      type: 'result',
       id: req.id,
-      message:
+      status: 'error',
+      stdout: '',
+      stderr:
         err instanceof Error
-          ? `Python mühiti işə salına bilmədi: ${err.message}`
-          : 'Python mühiti yüklənərkən xəta baş verdi.',
+          ? `Python icra xətası: ${err.message}`
+          : 'Kod icra olunarkən gözlənilməz xəta baş verdi.',
+      executionTimeMs: 0,
+      testResults: [],
     });
   }
 });

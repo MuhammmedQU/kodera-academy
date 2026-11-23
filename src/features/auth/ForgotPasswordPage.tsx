@@ -8,6 +8,7 @@ import type { z } from 'zod';
 import {
   Alert,
   Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -54,7 +55,7 @@ export function ForgotPasswordPage() {
     <div className="mx-auto max-w-md px-4 py-14 sm:py-20">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h1" className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-[#4338CA]" />
             Şifrənin bərpası
           </CardTitle>
@@ -68,11 +69,9 @@ export function ForgotPasswordPage() {
               <Alert variant="success" title="Sorğu qəbul edildi">
                 {submittedMessage}
               </Alert>
-              <Link to="/login">
-                <Button variant="primary" className="w-full">
-                  Giriş səhifəsinə qayıt
-                </Button>
-              </Link>
+              <ButtonLink to="/login" variant="primary" className="w-full">
+                Giriş səhifəsinə qayıt
+              </ButtonLink>
             </div>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -81,6 +80,7 @@ export function ForgotPasswordPage() {
                 label="Email ünvanı"
                 type="email"
                 required
+                autoComplete="email"
                 placeholder="adiniz@example.com"
                 error={errors.email?.message}
                 {...register('email')}

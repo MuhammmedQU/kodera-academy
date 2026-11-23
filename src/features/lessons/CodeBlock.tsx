@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Highlight, themes, type Language } from 'prism-react-renderer';
 import { Check, Copy, Terminal } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -36,12 +36,20 @@ export function CodeBlock({
   className,
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1800);
     } catch {
       // Clipboard may be restricted in non-HTTPS environments
     }
@@ -55,19 +63,19 @@ export function CodeBlock({
       )}
     >
       <div className="flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900/90 px-4 py-2.5">
-        <div className="flex items-center gap-2.5 text-xs">
-          <span className="rounded-md bg-[#4338CA]/25 px-2 py-0.5 font-mono font-semibold text-indigo-300 uppercase">
+        <div className="flex min-w-0 items-center gap-2.5 text-xs">
+          <span className="shrink-0 rounded-md bg-[#4338CA]/25 px-2 py-0.5 font-mono font-semibold text-indigo-300 uppercase">
             {language}
           </span>
           {(filename || title) && (
-            <span className="font-mono text-zinc-300">{filename || title}</span>
+            <span className="truncate font-mono text-zinc-300">{filename || title}</span>
           )}
         </div>
         <button
           type="button"
           onClick={handleCopy}
           aria-label="Kodu kopyala"
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
         >
           {copied ? (
             <>
@@ -89,29 +97,28 @@ export function CodeBlock({
             className={cn(hlClass, 'overflow-x-auto p-4 font-mono text-[13.5px] leading-relaxed')}
             style={{ ...style, backgroundColor: 'transparent', margin: 0 }}
           >
-            {tokens.map((line, i) => {
-              const lineNum = i + 1;
-              const isHighlighted = highlightLines.includes(lineNum);
-              return (
-                <div
-                  key={lineNum}
-                  {...getLineProps({ line })}
-                  className={cn(
-                    'table-row',
-                    isHighlighted && 'bg-[#4338CA]/25',
-                  )}
-                >
-                  <span className="table-cell select-none pr-4 text-right text-xs text-zinc-500">
-                    {lineNum}
-                  </span>
-                  <span className="table-cell">
-                    {line.map((token, key) => (
-                      <span key={key} {...getTokenProps({ token })} />
-                    ))}
-                  </span>
-                </div>
-              );
-            })}
+            <div className="table w-full">
+              {tokens.map((line, i) => {
+                const lineNum = i + 1;
+                const isHighlighted = highlightLines.includes(lineNum);
+                return (
+                  <div
+                    key={lineNum}
+                    {...getLineProps({ line })}
+                    className={cn('table-row', isHighlighted && 'bg-[#4338CA]/25')}
+                  >
+                    <span className="table-cell select-none pr-4 text-right text-xs text-zinc-500">
+                      {lineNum}
+                    </span>
+                    <span className="table-cell">
+                      {line.map((token, key) => (
+                        <span key={key} {...getTokenProps({ token })} />
+                      ))}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </pre>
         )}
       </Highlight>
@@ -120,7 +127,7 @@ export function CodeBlock({
         <div className="border-t border-zinc-800 bg-zinc-950/90 px-4 py-3">
           <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-zinc-400 uppercase">
             <Terminal className="h-3.5 w-3.5 text-[#F59E0B]" />
-            Ekranda görünən nəticə (Output)
+            Ekranda görünən nəticə
           </div>
           <pre className="overflow-x-auto font-mono text-xs text-emerald-300">{expectedOutput}</pre>
         </div>

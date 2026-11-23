@@ -26,10 +26,10 @@ import type {
   QuizAttemptResult,
   QuizAttemptSummary,
   StudentCourseWithProgress,
-} from '../../src/shared/types/domain';
-import { buildInitialSeedContent, SEED_IDS, type SeedExercise } from '../content/initialSeed';
-import { HttpError } from '../lib/http';
-import type { AuditContext, KoderaRepository } from '../lib/repository';
+} from '../../src/shared/types/domain.js';
+import { buildInitialSeedContent, SEED_IDS, type SeedExercise } from '../content/initialSeed.js';
+import { HttpError } from '../lib/http.js';
+import type { AuditContext, KoderaRepository } from '../lib/repository.js';
 import type {
   ApplicationReviewInput,
   ContentBlockUpsertInput,
@@ -44,7 +44,7 @@ import type {
   QuizSubmitInput,
   QuizUpsertInput,
   RegisterInput,
-} from '../lib/types';
+} from '../lib/types.js';
 
 function hashPassword(password: string, salt?: string): string {
   const s = salt || crypto.randomBytes(16).toString('hex');
@@ -409,18 +409,28 @@ export class LocalSandboxRepository implements KoderaRepository {
   }
 
   private enrichCourseCounts(course: Course): Course {
-    const mods = Array.from(this.modules.values()).filter(
-      (m) => m.course_id === course.id && m.is_published,
-    );
+    const mods = Array.from(this.modules.values())
+      .filter((m) => m.course_id === course.id && m.is_published)
+      .sort((a, b) => a.sort_order - b.sort_order);
     const modIds = new Set(mods.map((m) => m.id));
-    const lessons = Array.from(this.lessons.values()).filter(
-      (l) => modIds.has(l.module_id) && l.is_published,
-    );
+    const lessons = Array.from(this.lessons.values())
+      .filter((l) => modIds.has(l.module_id) && l.is_published)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    let firstPublicLessonSlug: string | null = null;
+    for (const m of mods) {
+      if (!m.is_public) continue;
+      const firstLesson = lessons.find((l) => l.module_id === m.id);
+      if (firstLesson) {
+        firstPublicLessonSlug = firstLesson.slug;
+        break;
+      }
+    }
     return {
       ...course,
       public_module_count: mods.filter((m) => m.is_public).length,
       total_module_count: mods.length,
       total_lesson_count: lessons.length,
+      first_public_lesson_slug: firstPublicLessonSlug,
     };
   }
 
@@ -540,8 +550,16 @@ export class LocalSandboxRepository implements KoderaRepository {
     return { access_token: token, user };
   }
 
+  async logoutSandbox(token: string): Promise<void> {
+    this.sessions.delete(token);
+  }
+
   async requestPasswordReset(_email: string): Promise<void> {
     // Intentionally no-op returning uniform response to prevent account enumeration
+  }
+
+  async resendVerificationEmail(_email: string): Promise<void> {
+    // Intentionally no-op in local sandbox
   }
 
   // --- Public Read ---
@@ -712,18 +730,24 @@ export class LocalSandboxRepository implements KoderaRepository {
         lesson: current.lesson,
         blocks,
         prev_lesson: prevItem
-          ? {
-              slug: prevItem.lesson.slug,
-              title: prevItem.lesson.title,
-              is_locked: !this.canAccessModule(viewer, prevItem.module, course),
-            }
+          ? (() => {
+              const locked = !this.canAccessModule(viewer, prevItem.module, course);
+              return {
+                slug: locked ? null : prevItem.lesson.slug,
+                title: prevItem.lesson.title,
+                is_locked: locked,
+              };
+            })()
           : null,
         next_lesson: nextItem
-          ? {
-              slug: nextItem.lesson.slug,
-              title: nextItem.lesson.title,
-              is_locked: !this.canAccessModule(viewer, nextItem.module, course),
-            }
+          ? (() => {
+              const locked = !this.canAccessModule(viewer, nextItem.module, course);
+              return {
+                slug: locked ? null : nextItem.lesson.slug,
+                title: nextItem.lesson.title,
+                is_locked: locked,
+              };
+            })()
           : null,
         is_last_public_lesson: isLastPublicLesson,
         is_enrolled: isEnrolled,
@@ -802,7 +826,9 @@ export class LocalSandboxRepository implements KoderaRepository {
     const quizAttempts = this.quizAttempts
       .filter((q) => q.student_id === studentId)
       .map((q) => ({ ...q, quiz_title: this.quizzes.get(q.quiz_id)?.title }));
-    const exerciseAttempts = this.exerciseAttempts.filter((e) => e.student_id === studentId);
+    const exerciseAttempts = this.exerciseAttempts
+      .filter((e) => e.student_id === studentId)
+      .map((e) => ({ ...e, exercise_title: this.exercises.get(e.exercise_id)?.title }));
 
     return {
       courses,
@@ -823,7 +849,11 @@ export class LocalSandboxRepository implements KoderaRepository {
       throw new HttpError(404, 'LESSON_NOT_FOUND', 'Dərs tapılmadı.');
     }
     const mod = this.modules.get(lesson.module_id);
-    if (!mod || !this.isEnrolled(viewer, mod.course_id)) {
+    const course = mod ? this.courses.get(mod.course_id) : undefined;
+    if (!mod || !mod.is_published || !course || !course.is_published) {
+      throw new HttpError(404, 'LESSON_NOT_FOUND', 'Dərs tapılmadı.');
+    }
+    if (!this.isEnrolled(viewer, mod.course_id)) {
       throw new HttpError(
         403,
         'COURSE_NOT_ASSIGNED',
@@ -858,7 +888,11 @@ export class LocalSandboxRepository implements KoderaRepository {
     if (!ex) throw new HttpError(404, 'EXERCISE_NOT_FOUND', 'Məşq tapılmadı.');
     const lesson = this.lessons.get(ex.lesson_id);
     const mod = lesson ? this.modules.get(lesson.module_id) : undefined;
-    if (!mod || !this.isEnrolled(viewer, mod.course_id)) {
+    const course = mod ? this.courses.get(mod.course_id) : undefined;
+    if (!lesson || !lesson.is_published || !mod || !mod.is_published || !course || !course.is_published) {
+      throw new HttpError(404, 'EXERCISE_NOT_FOUND', 'Məşq tapılmadı.');
+    }
+    if (!this.isEnrolled(viewer, mod.course_id)) {
       throw new HttpError(
         403,
         'COURSE_NOT_ASSIGNED',
@@ -866,14 +900,19 @@ export class LocalSandboxRepository implements KoderaRepository {
       );
     }
 
+    const visibleTests = ex.test_cases.filter((tc) => !tc.is_hidden).length;
+    const boundedTotal = Math.min(input.total_tests, visibleTests);
+    const boundedPassed = Math.min(input.passed_tests, boundedTotal);
+
     const attempt: ExerciseAttemptSummary = {
       id: crypto.randomUUID(),
       student_id: studentId,
       exercise_id: exerciseId,
+      exercise_title: ex.title,
       submitted_code: input.submitted_code,
       status: input.status,
-      passed_tests: input.passed_tests,
-      total_tests: input.total_tests,
+      passed_tests: boundedPassed,
+      total_tests: boundedTotal,
       stdout: input.stdout ?? null,
       stderr: input.stderr ?? null,
       execution_time_ms: input.execution_time_ms ?? null,
@@ -1140,11 +1179,33 @@ export class LocalSandboxRepository implements KoderaRepository {
     reason: string | undefined,
     audit: AuditContext,
   ): Promise<Profile> {
+    if (studentId === audit.actorId) {
+      throw new HttpError(
+        403,
+        'SELF_MODIFICATION_FORBIDDEN',
+        'Öz administrator hesabınızın statusunu dəyişə bilməzsiniz.',
+      );
+    }
     const profile = this.profiles.get(studentId);
     if (!profile) throw new HttpError(404, 'STUDENT_NOT_FOUND', 'Tələbə tapılmadı.');
+    const targetRoles = this.roles.get(studentId);
+    if (targetRoles?.has('admin')) {
+      throw new HttpError(403, 'ADMIN_PROTECTED', 'Administrator hesabları bu bölmədən dondurula bilməz.');
+    }
+    if (!targetRoles?.has('student')) {
+      throw new HttpError(400, 'NOT_A_STUDENT', 'Yalnız tələbə hesablarının statusu dəyişdirilə bilər.');
+    }
+    if (profile.account_status !== 'active' && profile.account_status !== 'suspended') {
+      throw new HttpError(
+        400,
+        'APPROVAL_WORKFLOW_REQUIRED',
+        'Gözləmədə, rədd edilmiş və ya arxivlənmiş hesablar yalnız müraciət təsdiqi axını ilə aktivləşdirilə bilər.',
+      );
+    }
     const updated: Profile = {
       ...profile,
       account_status: accountStatus,
+      archived_at: null,
       updated_at: new Date().toISOString(),
     };
     this.profiles.set(studentId, updated);
@@ -1181,7 +1242,7 @@ export class LocalSandboxRepository implements KoderaRepository {
   ): Promise<Enrollment[]> {
     const profile = this.profiles.get(studentId);
     if (!profile) throw new HttpError(404, 'STUDENT_NOT_FOUND', 'Tələbə tapılmadı.');
-    if (profile.account_status !== 'active') {
+    if (profile.account_status !== 'active' || !this.roles.get(studentId)?.has('student')) {
       throw new HttpError(
         400,
         'STUDENT_NOT_ACTIVE',
@@ -1191,7 +1252,7 @@ export class LocalSandboxRepository implements KoderaRepository {
 
     const now = new Date().toISOString();
     const assigned: Enrollment[] = [];
-    for (const courseId of courseIds) {
+    for (const courseId of Array.from(new Set(courseIds))) {
       if (!this.courses.has(courseId)) {
         throw new HttpError(404, 'COURSE_NOT_FOUND', `Kurs tapılmadı (${courseId}).`);
       }

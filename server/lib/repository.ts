@@ -22,7 +22,7 @@ import type {
   QuizAttemptResult,
   QuizAttemptSummary,
   StudentCourseWithProgress,
-} from '../../src/shared/types/domain';
+} from '../../src/shared/types/domain.js';
 import type {
   ApplicationReviewInput,
   ContentBlockUpsertInput,
@@ -37,7 +37,7 @@ import type {
   QuizSubmitInput,
   QuizUpsertInput,
   RegisterInput,
-} from './types';
+} from './types.js';
 
 export interface AuditContext {
   actorId: string | null;
@@ -67,7 +67,9 @@ export interface KoderaRepository {
     user?: AuthSessionUser;
   }>;
   loginSandbox?(email: string, password: string): Promise<{ access_token: string; user: AuthSessionUser }>;
+  logoutSandbox?(token: string): Promise<void>;
   requestPasswordReset(email: string): Promise<void>;
+  resendVerificationEmail(email: string): Promise<void>;
 
   // Public read
   getPublicSettings(): Promise<PublicPlatformSettings>;

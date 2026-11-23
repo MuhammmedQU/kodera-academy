@@ -14,64 +14,96 @@ import {
   Spinner,
 } from '@/components/ui';
 import { apiRequest, ApiError } from '@/lib/apiClient';
-import { formatAccountStatusAz } from '@/lib/formatters';
+import { formatAccountStatusAz, formatContentStatusAz } from '@/lib/formatters';
 
 export function AdminStudentsPage() {
   const [students, setStudents] = useState<AdminStudentView[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [assignModalStudent, setAssignModalStudent] = useState<AdminStudentView | null>(null);
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [statusModalStudent, setStatusModalStudent] = useState<AdminStudentView | null>(null);
+  const [statusReason, setStatusReason] = useState('');
+  const [modalError, setModalError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams();
-      if (statusFilter !== 'all') qs.set('status', statusFilter);
-      if (search.trim()) qs.set('search', search.trim());
-      const [studentList, courseList] = await Promise.all([
-        apiRequest<AdminStudentView[]>(
-          `/api/admin/students${qs.toString() ? `?${qs.toString()}` : ''}`,
-        ),
-        apiRequest<Course[]>('/api/admin/courses'),
-      ]);
-      setStudents(studentList);
-      setCourses(courseList);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Tələbə siyahısı yüklənmədi.');
-    } finally {
-      setLoading(false);
-    }
-  }, [search, statusFilter]);
+  // Fetch courses once on mount instead of every search keystroke
+  useEffect(() => {
+    const controller = new AbortController();
+    apiRequest<Course[]>('/api/admin/courses', { signal: controller.signal })
+      .then(setCourses)
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const toggleAccountStatus = async (student: AdminStudentView) => {
-    const nextStatus = student.profile.account_status === 'suspended' ? 'active' : 'suspended';
+  const loadStudents = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsFetching(true);
+      setError(null);
+      try {
+        const qs = new URLSearchParams();
+        if (statusFilter !== 'all') qs.set('status', statusFilter);
+        if (debouncedSearch.trim()) qs.set('search', debouncedSearch.trim());
+        const studentList = await apiRequest<AdminStudentView[]>(
+          `/api/admin/students${qs.toString() ? `?${qs.toString()}` : ''}`,
+          { signal },
+        );
+        setStudents(studentList);
+      } catch (err) {
+        if (signal?.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Tələbə siyahısı yüklənmədi.');
+      } finally {
+        if (!signal?.aborted) {
+          setInitialLoading(false);
+          setIsFetching(false);
+        }
+      }
+    },
+    [debouncedSearch, statusFilter],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadStudents(controller.signal);
+    return () => controller.abort();
+  }, [loadStudents]);
+
+  const handleConfirmAccountStatus = async () => {
+    if (!statusModalStudent) return;
+    const nextStatus =
+      statusModalStudent.profile.account_status === 'suspended' ? 'active' : 'suspended';
     setBusy(true);
-    setError(null);
+    setModalError(null);
     try {
-      await apiRequest(`/api/admin/students/${student.profile.id}/status`, {
+      await apiRequest(`/api/admin/students/${statusModalStudent.profile.id}/status`, {
         method: 'PATCH',
-        body: { account_status: nextStatus },
+        body: {
+          account_status: nextStatus,
+          reason: statusReason.trim() || undefined,
+        },
       });
       setFeedback(
         nextStatus === 'suspended'
-          ? `${student.profile.full_name} hesabı donduruldu.`
-          : `${student.profile.full_name} hesabı yenidən aktivləşdirildi.`,
+          ? `${statusModalStudent.profile.full_name} hesabı donduruldu.`
+          : `${statusModalStudent.profile.full_name} hesabı yenidən aktivləşdirildi.`,
       );
-      await loadData();
+      setStatusModalStudent(null);
+      setStatusReason('');
+      await loadStudents();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Status dəyişdirilə bilmədi.');
+      setModalError(err instanceof ApiError ? err.message : 'Status dəyişdirilə bilmədi.');
     } finally {
       setBusy(false);
     }
@@ -80,7 +112,7 @@ export function AdminStudentsPage() {
   const handleAssignCourses = async () => {
     if (!assignModalStudent || selectedCourseIds.length === 0) return;
     setBusy(true);
-    setError(null);
+    setModalError(null);
     try {
       await apiRequest('/api/admin/enrollments', {
         method: 'POST',
@@ -92,13 +124,19 @@ export function AdminStudentsPage() {
       setFeedback(`${assignModalStudent.profile.full_name} üçün kurs təyinatı yeniləndi.`);
       setAssignModalStudent(null);
       setSelectedCourseIds([]);
-      await loadData();
+      await loadStudents();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Kurs təyin edilə bilmədi.');
+      setModalError(err instanceof ApiError ? err.message : 'Kurs təyin edilə bilmədi.');
     } finally {
       setBusy(false);
     }
   };
+
+  const activeCourseIdsForModal = new Set(
+    (assignModalStudent?.enrollments ?? [])
+      .filter((e) => e.status === 'active' || e.status === 'completed')
+      .map((e) => e.course_id),
+  );
 
   return (
     <div className="space-y-6">
@@ -135,7 +173,11 @@ export function AdminStudentsPage() {
         </Select>
       </div>
 
-      {loading ? (
+      {isFetching && !initialLoading && (
+        <p className="text-xs text-zinc-500">Siyahı yenilənir...</p>
+      )}
+
+      {initialLoading ? (
         <Spinner label="Tələbələr yüklənir..." />
       ) : students.length === 0 ? (
         <EmptyState
@@ -150,11 +192,11 @@ export function AdminStudentsPage() {
             return (
               <Card key={st.profile.id}>
                 <CardContent className="flex flex-col justify-between gap-4 p-5 lg:flex-row lg:items-center">
-                  <div className="space-y-1.5">
+                  <div className="min-w-0 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-display text-base font-bold text-[#18181B]">
+                      <h2 className="font-display text-base font-bold text-[#18181B]">
                         {st.profile.full_name}
-                      </h3>
+                      </h2>
                       <Badge
                         variant={
                           st.profile.account_status === 'active'
@@ -189,6 +231,7 @@ export function AdminStudentsPage() {
                         onClick={() => {
                           setAssignModalStudent(st);
                           setSelectedCourseIds([]);
+                          setModalError(null);
                         }}
                       >
                         <GraduationCap className="h-4 w-4" />
@@ -201,7 +244,11 @@ export function AdminStudentsPage() {
                         variant={st.profile.account_status === 'suspended' ? 'outline' : 'danger'}
                         size="sm"
                         disabled={busy}
-                        onClick={() => toggleAccountStatus(st)}
+                        onClick={() => {
+                          setStatusModalStudent(st);
+                          setStatusReason('');
+                          setModalError(null);
+                        }}
                       >
                         {st.profile.account_status === 'suspended' ? (
                           <>
@@ -224,9 +271,13 @@ export function AdminStudentsPage() {
         </div>
       )}
 
+      {/* Assign Courses Modal */}
       <Modal
         open={Boolean(assignModalStudent)}
-        onClose={() => setAssignModalStudent(null)}
+        onClose={() => {
+          setAssignModalStudent(null);
+          setModalError(null);
+        }}
         title="Tələbəyə kurs təyin et"
         description={
           assignModalStudent
@@ -235,18 +286,20 @@ export function AdminStudentsPage() {
         }
       >
         <div className="space-y-4">
+          {modalError && <Alert variant="error">{modalError}</Alert>}
           <p className="text-sm text-zinc-600">
             Tələbənin giriş əldə etməsini istədiyiniz bir və ya bir neçə kursu seçin:
           </p>
           <div className="space-y-2">
             {courses.map((c) => {
               const checked = selectedCourseIds.includes(c.id);
+              const alreadyActive = activeCourseIdsForModal.has(c.id);
               return (
                 <label
                   key={c.id}
-                  className="flex cursor-pointer items-center justify-between rounded-xl border border-zinc-200 p-3.5 hover:bg-zinc-50"
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-zinc-200 p-3.5 hover:bg-zinc-50"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -255,14 +308,19 @@ export function AdminStudentsPage() {
                           prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id],
                         )
                       }
-                      className="h-4 w-4 rounded accent-[#4338CA]"
+                      className="h-4 w-4 shrink-0 rounded accent-[#4338CA]"
                     />
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-[#18181B]">{c.title}</p>
                       <p className="text-xs text-zinc-500">{c.programming_language.toUpperCase()}</p>
                     </div>
                   </div>
-                  <Badge variant={c.is_published ? 'success' : 'neutral'}>{c.status}</Badge>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {alreadyActive && <Badge variant="brand">Artıq təyinli</Badge>}
+                    <Badge variant={c.is_published ? 'success' : 'neutral'}>
+                      {formatContentStatusAz(c.status)}
+                    </Badge>
+                  </div>
                 </label>
               );
             })}
@@ -281,6 +339,60 @@ export function AdminStudentsPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Suspend / Reactivate Confirmation Modal */}
+      <Modal
+        open={Boolean(statusModalStudent)}
+        onClose={() => {
+          setStatusModalStudent(null);
+          setModalError(null);
+        }}
+        title={
+          statusModalStudent?.profile.account_status === 'suspended'
+            ? 'Tələbə hesabını aktivləşdir'
+            : 'Tələbə hesabını dondur'
+        }
+        description={
+          statusModalStudent
+            ? `${statusModalStudent.profile.full_name} (${statusModalStudent.profile.email})`
+            : ''
+        }
+      >
+        {statusModalStudent && (
+          <div className="space-y-4">
+            {modalError && <Alert variant="error">{modalError}</Alert>}
+            <Alert
+              variant={statusModalStudent.profile.account_status === 'suspended' ? 'info' : 'warning'}
+            >
+              {statusModalStudent.profile.account_status === 'suspended'
+                ? 'Hesab yenidən aktivləşdirildikdə tələbə təyin olunmuş kurslarına daxil ola biləcək.'
+                : 'Hesab dondurulduqda tələbənin Tələbə Panelinə və məhdud dərslərə girişi dərhal dayandırılacaq.'}
+            </Alert>
+            <Input
+              label="Səbəb (istəyə bağlı — audit jurnalında saxlanılır)"
+              placeholder="Qısa inzibati qeyd..."
+              value={statusReason}
+              onChange={(e) => setStatusReason(e.target.value)}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setStatusModalStudent(null)}>
+                Ləğv et
+              </Button>
+              <Button
+                variant={
+                  statusModalStudent.profile.account_status === 'suspended' ? 'primary' : 'danger'
+                }
+                isLoading={busy}
+                onClick={handleConfirmAccountStatus}
+              >
+                {statusModalStudent.profile.account_status === 'suspended'
+                  ? 'Bəli, aktivləşdir'
+                  : 'Bəli, hesabı dondur'}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

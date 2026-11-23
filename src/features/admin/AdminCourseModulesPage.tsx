@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpenText, Globe, Lock, Plus } from 'lucide-react';
+import { ArrowLeft, BookOpenText, Edit3, Globe, Lock, Plus } from 'lucide-react';
 import type { ContentStatus, ModuleItem } from '@shared/types/domain';
 import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   CardContent,
   EmptyState,
@@ -16,7 +17,7 @@ import {
   Textarea,
 } from '@/components/ui';
 import { apiRequest, ApiError } from '@/lib/apiClient';
-import { formatContentStatusAz } from '@/lib/formatters';
+import { formatContentStatusAz, slugifyAz } from '@/lib/formatters';
 
 export function AdminCourseModulesPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -25,6 +26,9 @@ export function AdminCourseModulesPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingModule, setEditingModule] = useState<ModuleItem | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [slugTouched, setSlugTouched] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [form, setForm] = useState({
@@ -36,6 +40,9 @@ export function AdminCourseModulesPage() {
     status: 'published' as ContentStatus,
   });
 
+  const getNextSortOrder = (list: ModuleItem[]) =>
+    Math.max(0, ...list.map((m) => m.sort_order)) + 1;
+
   const loadModules = useCallback(async () => {
     if (!courseId) return;
     setLoading(true);
@@ -43,7 +50,6 @@ export function AdminCourseModulesPage() {
     try {
       const data = await apiRequest<ModuleItem[]>(`/api/admin/courses/${courseId}/modules`);
       setModules(data);
-      setForm((p) => ({ ...p, sort_order: data.length + 1 }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Modullar yüklənmədi.');
     } finally {
@@ -55,37 +61,75 @@ export function AdminCourseModulesPage() {
     void loadModules();
   }, [loadModules]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreateModal = () => {
+    setEditingModule(null);
+    setForm({
+      title: '',
+      slug: '',
+      description: '',
+      sort_order: getNextSortOrder(modules),
+      is_public: false,
+      status: 'published',
+    });
+    setSlugTouched(false);
+    setModalError(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (mod: ModuleItem) => {
+    setEditingModule(mod);
+    setForm({
+      title: mod.title,
+      slug: mod.slug,
+      description: mod.description ?? '',
+      sort_order: mod.sort_order,
+      is_public: mod.is_public,
+      status: mod.status,
+    });
+    setSlugTouched(true);
+    setModalError(null);
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseId) return;
     setBusy(true);
-    setError(null);
+    setModalError(null);
     try {
-      await apiRequest('/api/admin/modules', {
-        method: 'POST',
-        body: {
-          course_id: courseId,
-          title: form.title,
-          slug: form.slug,
-          description: form.description || null,
-          sort_order: Number(form.sort_order),
-          is_public: form.is_public,
-          status: form.status,
-        },
-      });
+      if (editingModule) {
+        await apiRequest(`/api/admin/modules/${editingModule.id}`, {
+          method: 'PATCH',
+          body: {
+            title: form.title,
+            slug: form.slug,
+            description: form.description || null,
+            sort_order: Number(form.sort_order),
+            is_public: form.is_public,
+            status: form.status,
+          },
+        });
+        setFeedback(`"${form.title}" modulu yeniləndi.`);
+      } else {
+        await apiRequest('/api/admin/modules', {
+          method: 'POST',
+          body: {
+            course_id: courseId,
+            title: form.title,
+            slug: form.slug,
+            description: form.description || null,
+            sort_order: Number(form.sort_order),
+            is_public: form.is_public,
+            status: form.status,
+          },
+        });
+        setFeedback('Yeni modul yaradıldı.');
+      }
       setModalOpen(false);
-      setForm({
-        title: '',
-        slug: '',
-        description: '',
-        sort_order: modules.length + 2,
-        is_public: false,
-        status: 'published',
-      });
-      setFeedback('Yeni modul yaradıldı.');
+      setEditingModule(null);
       await loadModules();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Modul yaradılmadı.');
+      setModalError(err instanceof ApiError ? err.message : 'Əməliyyat uğursuz oldu.');
     } finally {
       setBusy(false);
     }
@@ -143,11 +187,11 @@ export function AdminCourseModulesPage() {
             Modul İdarəetməsi və İctimai Giriş Ayarları
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Hansı modulların qeydiyyatsız ziyarətçilərə açıq (`is_public = true`) olacağını birbaşa
-            verilənlər bazasından idarə edin.
+            Hansı modulların qeydiyyatsız ziyarətçilərə açıq olacağını birbaşa verilənlər bazasından
+            idarə edin.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setModalOpen(true)}>
+        <Button variant="primary" onClick={openCreateModal}>
           <Plus className="h-4 w-4" />
           Yeni modul
         </Button>
@@ -168,12 +212,12 @@ export function AdminCourseModulesPage() {
           {modules.map((mod) => (
             <Card key={mod.id}>
               <CardContent className="flex flex-col justify-between gap-4 p-5 lg:flex-row lg:items-center">
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-700">
                       #{mod.sort_order}
                     </span>
-                    <h3 className="font-display text-base font-bold text-[#18181B]">{mod.title}</h3>
+                    <h2 className="font-display text-base font-bold text-[#18181B]">{mod.title}</h2>
                     {mod.is_public ? (
                       <Badge variant="amber">
                         <Globe className="h-3 w-3" />
@@ -193,12 +237,24 @@ export function AdminCourseModulesPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/admin/modules/${mod.id}/lessons`}>
-                    <Button variant="primary" size="sm">
-                      <BookOpenText className="h-4 w-4" />
-                      Dərslər
-                    </Button>
-                  </Link>
+                  <ButtonLink
+                    to={`/admin/modules/${mod.id}/lessons`}
+                    state={{ courseId }}
+                    variant="primary"
+                    size="sm"
+                  >
+                    <BookOpenText className="h-4 w-4" />
+                    Dərslər
+                  </ButtonLink>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => openEditModal(mod)}
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    Redaktə et
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -222,24 +278,42 @@ export function AdminCourseModulesPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Yeni modul yarat">
-        <form onSubmit={handleCreate} className="space-y-4">
+      <Modal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setModalError(null);
+        }}
+        title={editingModule ? `Modulu redaktə et: ${editingModule.title}` : 'Yeni modul yarat'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {modalError && <Alert variant="error">{modalError}</Alert>}
           <Input
             label="Modulun adı"
             required
             value={form.title}
-            onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+            onChange={(e) => {
+              const title = e.target.value;
+              setForm((p) => ({
+                ...p,
+                title,
+                slug: slugTouched ? p.slug : slugifyAz(title),
+              }));
+            }}
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
-              label="Slug"
+              label="URL Slug"
               required
               placeholder="modul-4-funksiyalar"
               value={form.slug}
-              onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setForm((p) => ({ ...p, slug: e.target.value }));
+              }}
             />
             <Input
-              label="Sıra nömrəsi (sort_order)"
+              label="Sıra nömrəsi"
               type="number"
               min={0}
               required
@@ -259,8 +333,9 @@ export function AdminCourseModulesPage() {
               value={form.status}
               onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ContentStatus }))}
             >
-              <option value="published">Dərc olunmuş</option>
+              <option value="published">Dərc olunub</option>
               <option value="draft">Qaralama</option>
+              <option value="archived">Arxivlənib</option>
             </Select>
             <label className="flex items-center gap-2.5 self-end rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm font-medium">
               <input
@@ -277,7 +352,7 @@ export function AdminCourseModulesPage() {
               Ləğv et
             </Button>
             <Button type="submit" variant="primary" isLoading={busy}>
-              Modulu yarat
+              {editingModule ? 'Dəyişiklikləri saxla' : 'Modulu yarat'}
             </Button>
           </div>
         </form>

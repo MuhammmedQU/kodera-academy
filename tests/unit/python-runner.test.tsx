@@ -131,6 +131,25 @@ describe('Phase 7 — Interactive Python Runner (Harness & Isolated Web Worker)'
     expect(fail.testResults[0]?.passed).toBe(false);
     expect(fail.testResults[0]?.expected).toBe('Düzgün');
     expect(fail.testResults[0]?.actual).toBe('Yanlış');
+
+    // Assertion failure in assertion_code must classify as 'failed' (NOT runtime 'error') without leaking <test_assertion.py>
+    const assertFail = execHarnessInPython('cem = 10\nprint(cem)', [
+      {
+        label: 'cem 20 olmalıdır',
+        stdin_input: '',
+        expected_stdout: '20',
+        assertion_code: 'assert cem == 20',
+      },
+    ]);
+    expect(assertFail.status).toBe('failed');
+    expect(assertFail.stderr).toBe('');
+    expect(assertFail.testResults[0]?.passed).toBe(false);
+    expect(assertFail.testResults[0]?.error).not.toContain('<test_assertion.py>');
+
+    // Restricted browser bridge modules (js, pyodide) must be blocked inside harness
+    const bridgeAttempt = execHarnessInPython('import js', []);
+    expect(bridgeAttempt.status).toBe('error');
+    expect(bridgeAttempt.stderr).toContain('məhdudlaşdırılıb');
   });
 
   it('captures runtime errors and truncates huge stdout output safely', () => {
@@ -187,6 +206,18 @@ describe('Phase 7 — Interactive Python Runner (Harness & Isolated Web Worker)'
     const out2 = await p2;
     expect(out2.status).toBe('passed');
     expect(out2.stdout).toBe('42\n');
+
+    // Manual terminate() immediately resolves in-flight promise as cancelled and clears timer
+    const p3 = runner.run('while True:\n    pass', {
+      timeLimitMs: 5000,
+      maxOutputChars: 1000,
+      testCases: [],
+    });
+    workers[1]!.emitMessage({ type: 'ready' });
+    runner.terminate();
+    const out3 = await p3;
+    expect(out3.cancelled).toBe(true);
+    expect(workers[1]!.terminated).toBe(true);
   });
 
   it('renders ExerciseBlock UI, inserts 4 spaces on Tab, and displays execution outcome', async () => {

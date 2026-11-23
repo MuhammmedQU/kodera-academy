@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen } from 'lucide-react';
 import type { StudentCourseWithProgress } from '@shared/types/domain';
 import {
   Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -23,10 +22,17 @@ export function StudentCoursesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiRequest<StudentCourseWithProgress[]>('/api/student/courses')
+    const controller = new AbortController();
+    apiRequest<StudentCourseWithProgress[]>('/api/student/courses', { signal: controller.signal })
       .then(setCourses)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   if (loading) return <Spinner label="Təyin olunmuş kurslarınız yüklənir..." />;
@@ -48,9 +54,9 @@ export function StudentCoursesPage() {
           title="Təyin olunmuş kurs yoxdur"
           description="Administrator sizə kurs təyin etdikdən dərhal sonra bu siyahıda görünəcək."
           action={
-            <Link to="/courses">
-              <Button variant="outline">Kurs kataloquna bax</Button>
-            </Link>
+            <ButtonLink to="/courses" variant="outline">
+              Kurs kataloquna bax
+            </ButtonLink>
           }
         />
       ) : (
@@ -62,7 +68,9 @@ export function StudentCoursesPage() {
                   <Badge variant="brand">{item.course.programming_language.toUpperCase()}</Badge>
                   <Badge variant="neutral">{formatDifficultyAz(item.course.difficulty)}</Badge>
                 </div>
-                <CardTitle className="mt-2">{item.course.title}</CardTitle>
+                <CardTitle as="h2" className="mt-2">
+                  {item.course.title}
+                </CardTitle>
                 <CardDescription>
                   {item.course.subtitle || item.course.description}
                 </CardDescription>
@@ -74,20 +82,27 @@ export function StudentCoursesPage() {
                   </span>
                   <span>{formatDurationAz(item.course.estimated_duration_minutes)}</span>
                 </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  role="progressbar"
+                  aria-valuenow={item.progress_percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${item.course.title} irəliləyişi`}
+                  className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100"
+                >
                   <div
                     className="h-full rounded-full bg-[#4338CA]"
                     style={{ width: `${item.progress_percent}%` }}
                   />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Link to={`/dashboard/courses/${item.course.slug}`} className="flex-1">
-                    <Button variant="primary" className="w-full">
-                      Kursu aç
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
+                <ButtonLink
+                  to={`/dashboard/courses/${item.course.slug}`}
+                  variant="primary"
+                  className="w-full"
+                >
+                  Kursu aç
+                  <ArrowRight className="h-4 w-4" />
+                </ButtonLink>
               </CardContent>
             </Card>
           ))}

@@ -1,6 +1,5 @@
-import { Link } from 'react-router-dom';
 import { ArrowLeft, Compass } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { ButtonLink } from '@/components/ui';
 
 export function NotFoundPage() {
   return (
@@ -15,16 +14,14 @@ export function NotFoundPage() {
       <p className="mt-3 text-sm leading-relaxed text-zinc-600">
         Axtardığınız səhifə mövcud deyil, köçürülüb və ya giriş icazəsi tələb edir.
       </p>
-      <div className="mt-6 flex gap-3">
-        <Link to="/">
-          <Button variant="primary">
-            <ArrowLeft className="h-4 w-4" />
-            Ana səhifəyə qayıt
-          </Button>
-        </Link>
-        <Link to="/courses">
-          <Button variant="outline">Kurslara bax</Button>
-        </Link>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <ButtonLink to="/" variant="primary">
+          <ArrowLeft className="h-4 w-4" />
+          Ana səhifəyə qayıt
+        </ButtonLink>
+        <ButtonLink to="/courses" variant="outline">
+          Kurslara bax
+        </ButtonLink>
       </div>
     </div>
   );

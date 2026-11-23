@@ -14,7 +14,7 @@ import type { Course, CurriculumOutlineModule } from '@shared/types/domain';
 import {
   Alert,
   Badge,
-  Button,
+  ButtonLink,
   Card,
   CardContent,
   CardDescription,
@@ -22,6 +22,7 @@ import {
   CardTitle,
   Spinner,
 } from '@/components/ui';
+import { usePlatformSettings } from '@/app/SettingsContext';
 import { RegistrationInvitationCard } from '@/features/lessons/RegistrationInvitationCard';
 import { apiRequest, ApiError } from '@/lib/apiClient';
 import { formatDifficultyAz, formatDurationAz } from '@/lib/formatters';
@@ -34,29 +35,41 @@ interface CourseDetailData {
 
 export function CourseDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { settings } = usePlatformSettings();
   const [data, setData] = useState<CourseDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
-    apiRequest<CourseDetailData>(`/api/public/courses/${slug}`)
+    const controller = new AbortController();
+    window.scrollTo({ top: 0 });
+    setLoading(true);
+    setError(null);
+    setData(null);
+    apiRequest<CourseDetailData>(`/api/public/courses/${encodeURIComponent(slug)}`, {
+      signal: controller.signal,
+    })
       .then(setData)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Kurs tapılmadı.'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'Kurs tapılmadı.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [slug]);
 
   if (loading) return <Spinner fullPage label="Kurs məlumatları yüklənir..." />;
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 space-y-4">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-16">
         <Alert variant="error">{error || 'Kurs tapılmadı.'}</Alert>
-        <Link to="/courses">
-          <Button variant="outline">
-            <ArrowLeft className="h-4 w-4" />
-            Kurslara qayıt
-          </Button>
-        </Link>
+        <ButtonLink to="/courses" variant="outline">
+          <ArrowLeft className="h-4 w-4" />
+          Kurslara qayıt
+        </ButtonLink>
       </div>
     );
   }
@@ -65,7 +78,7 @@ export function CourseDetailPage() {
   const firstOpenLesson = outline.flatMap((m) => (m.can_access ? m.lessons : [])).find((l) => l.slug);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
+    <div className="mx-auto max-w-5xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
       <div>
         <Link
           to="/courses"
@@ -107,27 +120,25 @@ export function CourseDetailPage() {
 
           <div className="mt-7 flex flex-wrap gap-3">
             {is_enrolled ? (
-              <Link to={`/dashboard/courses/${course.slug}`}>
-                <Button variant="primary" size="lg">
-                  Tələbə Panelində aç
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+              <ButtonLink to={`/dashboard/courses/${course.slug}`} variant="primary" size="lg">
+                Tələbə Panelində aç
+                <ArrowRight className="h-4 w-4" />
+              </ButtonLink>
             ) : firstOpenLesson?.slug ? (
-              <Link to={`/courses/${course.slug}/lessons/${firstOpenLesson.slug}`}>
-                <Button variant="primary" size="lg">
-                  <PlayCircle className="h-4 w-4" />
-                  İlk pulsuz dərsə başla
-                </Button>
-              </Link>
+              <ButtonLink
+                to={`/courses/${course.slug}/lessons/${firstOpenLesson.slug}`}
+                variant="primary"
+                size="lg"
+              >
+                <PlayCircle className="h-4 w-4" />
+                İlk pulsuz dərsə başla
+              </ButtonLink>
             ) : null}
 
-            {!is_enrolled && (
-              <Link to="/register">
-                <Button variant="outline" size="lg">
-                  Tam kurs üçün müraciət et
-                </Button>
-              </Link>
+            {!is_enrolled && settings.registration_enabled && (
+              <ButtonLink to="/register" variant="outline" size="lg">
+                Tam kurs üçün müraciət et
+              </ButtonLink>
             )}
           </div>
         </div>
@@ -136,11 +147,11 @@ export function CourseDetailPage() {
       {course.learning_objectives.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Bu kursda nələri öyrənəcəksiniz?</CardTitle>
+            <CardTitle as="h2">Bu kursda nələri öyrənəcəksiniz?</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            {course.learning_objectives.map((obj) => (
-              <div key={obj} className="flex items-start gap-2.5 text-sm text-zinc-700">
+            {course.learning_objectives.map((obj, idx) => (
+              <div key={`${idx}-${obj}`} className="flex items-start gap-2.5 text-sm text-zinc-700">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                 <span>{obj}</span>
               </div>
@@ -186,30 +197,30 @@ export function CourseDetailPage() {
                     key={lesson.id}
                     className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       {mod.can_access ? (
                         <PlayCircle className="h-4 w-4 shrink-0 text-[#4338CA]" />
                       ) : (
                         <Lock className="h-4 w-4 shrink-0 text-zinc-400" />
                       )}
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-[#18181B]">{lesson.title}</p>
                         <p className="text-xs text-zinc-500">{lesson.estimated_minutes} dəq</p>
                       </div>
                     </div>
 
                     {mod.can_access && lesson.slug ? (
-                      <Link
+                      <ButtonLink
                         to={
                           is_enrolled
                             ? `/dashboard/courses/${course.slug}/lessons/${lesson.slug}`
                             : `/courses/${course.slug}/lessons/${lesson.slug}`
                         }
+                        variant="outline"
+                        size="sm"
                       >
-                        <Button variant="outline" size="sm">
-                          Oxu
-                        </Button>
-                      </Link>
+                        Oxu
+                      </ButtonLink>
                     ) : (
                       <span className="text-xs font-medium text-zinc-400">Kilidlidir</span>
                     )}

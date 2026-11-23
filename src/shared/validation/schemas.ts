@@ -3,6 +3,7 @@ import { z } from 'zod';
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const phoneRegex = /^\+?[0-9\s\-()]{7,25}$/;
 const whatsappDigitsRegex = /^[1-9][0-9]{7,14}$/;
+const languageRegex = /^[a-z0-9_+-]{1,40}$/;
 
 export const registerSchema = z.object({
   full_name: z
@@ -48,6 +49,10 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Düzgün email ünvanı daxil edin.'),
+});
+
+export const resendVerificationSchema = z.object({
   email: z.string().trim().toLowerCase().email('Düzgün email ünvanı daxil edin.'),
 });
 
@@ -117,7 +122,10 @@ export const studentAccountStatusSchema = z
 export const assignEnrollmentSchema = z
   .object({
     student_id: z.string().uuid('Tələbə ID düzgün deyil.'),
-    course_ids: z.array(z.string().uuid()).min(1, 'Ən azı bir kurs seçin.'),
+    course_ids: z
+      .array(z.string().uuid())
+      .min(1, 'Ən azı bir kurs seçin.')
+      .transform((ids) => Array.from(new Set(ids))),
   })
   .strict();
 
@@ -140,7 +148,12 @@ export const courseUpsertSchema = z
     description: z.string().trim().min(10).max(5000),
     learning_objectives: z.array(z.string().trim().min(2).max(300)).default([]),
     target_audience: z.string().trim().max(1000).nullable().optional(),
-    programming_language: z.string().trim().toLowerCase().min(1).max(40).default('python'),
+    programming_language: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(languageRegex, 'Proqramlaşdırma dili formatı düzgün deyil (məs., python, c++, sql).')
+      .default('python'),
     difficulty: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),
     estimated_duration_minutes: z.coerce.number().int().min(0).max(100000).default(0),
     cover_image_path: z.string().trim().max(500).nullable().optional(),
@@ -158,14 +171,22 @@ export const coursePatchSchema = z
     description: z.string().trim().min(10).max(5000).optional(),
     learning_objectives: z.array(z.string().trim().min(2).max(300)).optional(),
     target_audience: z.string().trim().max(1000).nullable().optional(),
-    programming_language: z.string().trim().toLowerCase().min(1).max(40).optional(),
+    programming_language: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(languageRegex, 'Proqramlaşdırma dili formatı düzgün deyil.')
+      .optional(),
     difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
     estimated_duration_minutes: z.coerce.number().int().min(0).max(100000).optional(),
     cover_image_path: z.string().trim().max(500).nullable().optional(),
     sort_order: z.coerce.number().int().min(0).optional(),
     status: z.enum(['draft', 'published', 'archived']).optional(),
   })
-  .strict();
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'Ən azı bir sahə yenilənməlidir.',
+  });
 
 export const moduleUpsertSchema = z
   .object({
@@ -188,7 +209,10 @@ export const modulePatchSchema = z
     is_public: z.boolean().optional(),
     status: z.enum(['draft', 'published', 'archived']).optional(),
   })
-  .strict();
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'Ən azı bir sahə yenilənməlidir.',
+  });
 
 export const lessonUpsertSchema = z
   .object({
@@ -211,7 +235,10 @@ export const lessonPatchSchema = z
     sort_order: z.coerce.number().int().min(0).optional(),
     status: z.enum(['draft', 'published', 'archived']).optional(),
   })
-  .strict();
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'Ən azı bir sahə yenilənməlidir.',
+  });
 
 export const contentBlockPatchSchema = z
   .object({
@@ -220,7 +247,10 @@ export const contentBlockPatchSchema = z
     content: z.record(z.string(), z.unknown()).optional(),
     is_published: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'Ən azı bir sahə yenilənməlidir.',
+  });
 
 export const contentBlockUpsertSchema = z
   .object({
@@ -278,7 +308,12 @@ export const exerciseUpsertSchema = z
     locale: z.enum(['az', 'en']).default('az'),
     title: z.string().trim().min(2).max(180),
     instructions: z.string().trim().min(5).max(5000),
-    programming_language: z.string().trim().toLowerCase().default('python'),
+    programming_language: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(languageRegex, 'Proqramlaşdırma dili formatı düzgün deyil.')
+      .default('python'),
     starter_code: z.string().max(20000).default(''),
     solution_code: z.string().max(20000).optional(),
     hints: z.array(z.string().trim().min(1).max(500)).default([]),
@@ -288,14 +323,23 @@ export const exerciseUpsertSchema = z
     status: z.enum(['draft', 'published', 'archived']).default('published'),
     test_cases: z
       .array(
-        z.object({
-          label: z.string().trim().min(1).max(160),
-          stdin_input: z.string().max(5000).default(''),
-          expected_stdout: z.string().max(10000).nullable().optional(),
-          assertion_code: z.string().max(10000).nullable().optional(),
-          is_hidden: z.boolean().default(false),
-          sort_order: z.coerce.number().int().min(0).default(0),
-        }),
+        z
+          .object({
+            label: z.string().trim().min(1).max(160),
+            stdin_input: z.string().max(5000).default(''),
+            expected_stdout: z.string().max(10000).nullable().optional(),
+            assertion_code: z.string().max(10000).nullable().optional(),
+            is_hidden: z.boolean().default(false),
+            sort_order: z.coerce.number().int().min(0).default(0),
+          })
+          .refine(
+            (tc) =>
+              (typeof tc.expected_stdout === 'string' && tc.expected_stdout.length > 0) ||
+              (typeof tc.assertion_code === 'string' && tc.assertion_code.trim().length > 0),
+            {
+              message: 'Hər test halında gözlənilən çıxış və ya assertion kodu olmalıdır.',
+            },
+          ),
       )
       .default([]),
   })
@@ -312,24 +356,52 @@ export const quizUpsertSchema = z
     status: z.enum(['draft', 'published', 'archived']).default('published'),
     questions: z
       .array(
-        z.object({
-          question_type: z.enum(['single_choice', 'multiple_choice', 'true_false']),
-          prompt: z.string().trim().min(3).max(2000),
-          code_snippet: z.string().max(10000).nullable().optional(),
-          code_language: z.string().max(40).nullable().optional(),
-          explanation: z.string().trim().max(2000).nullable().optional(),
-          points: z.coerce.number().int().min(1).max(100).default(1),
-          sort_order: z.coerce.number().int().min(0).default(0),
-          options: z
-            .array(
-              z.object({
-                option_text: z.string().trim().min(1).max(500),
-                is_correct: z.boolean(),
-                sort_order: z.coerce.number().int().min(0).default(0),
+        z
+          .object({
+            question_type: z.enum(['single_choice', 'multiple_choice', 'true_false']),
+            prompt: z.string().trim().min(3).max(2000),
+            code_snippet: z.string().max(10000).nullable().optional(),
+            code_language: z
+              .string()
+              .trim()
+              .toLowerCase()
+              .nullable()
+              .optional()
+              .transform((v) => (v && v.length > 0 ? v : null))
+              .refine((v) => v === null || languageRegex.test(v), {
+                message: 'Kod dili formatı düzgün deyil.',
               }),
-            )
-            .min(2),
-        }),
+            explanation: z.string().trim().max(2000).nullable().optional(),
+            points: z.coerce.number().int().min(1).max(100).default(1),
+            sort_order: z.coerce.number().int().min(0).default(0),
+            options: z
+              .array(
+                z.object({
+                  option_text: z.string().trim().min(1).max(500),
+                  is_correct: z.boolean(),
+                  sort_order: z.coerce.number().int().min(0).default(0),
+                }),
+              )
+              .min(2),
+          })
+          .superRefine((q, ctx) => {
+            const correctCount = q.options.filter((o) => o.is_correct).length;
+            if (correctCount === 0) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Hər sualda ən azı bir düzgün cavab seçilməlidir.',
+              });
+            }
+            if (
+              (q.question_type === 'single_choice' || q.question_type === 'true_false') &&
+              correctCount > 1
+            ) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Tək seçimli sualda yalnız bir düzgün cavab ola bilər.',
+              });
+            }
+          }),
       )
       .min(1),
   })
@@ -400,13 +472,14 @@ export const exerciseAttemptCreateSchema = z
     test_results: z
       .array(
         z.object({
-          label: z.string(),
+          label: z.string().max(200),
           passed: z.boolean(),
-          expected: z.string().nullable().optional(),
-          actual: z.string().nullable().optional(),
-          error: z.string().nullable().optional(),
+          expected: z.string().max(2000).nullable().optional(),
+          actual: z.string().max(2000).nullable().optional(),
+          error: z.string().max(2000).nullable().optional(),
         }),
       )
+      .max(50)
       .default([]),
   })
   .strict()

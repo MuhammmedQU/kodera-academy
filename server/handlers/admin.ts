@@ -16,10 +16,23 @@ import {
   quizUpsertSchema,
   revokeEnrollmentSchema,
   studentAccountStatusSchema,
-} from '../../src/shared/validation/schemas';
-import { requireAdmin } from '../lib/auth';
-import { HttpError, sendJson, type ApiRequest } from '../lib/http';
-import type { KoderaRepository } from '../lib/repository';
+} from '../../src/shared/validation/schemas.js';
+import { requireAdmin } from '../lib/auth.js';
+import { HttpError, sendJson, type ApiRequest } from '../lib/http.js';
+import type { KoderaRepository } from '../lib/repository.js';
+
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const APP_REVIEW_RE = new RegExp(`^applications/(${UUID_PATTERN})/review$`, 'i');
+const APP_NOTES_RE = new RegExp(`^applications/(${UUID_PATTERN})/notes$`, 'i');
+const STUDENT_STATUS_RE = new RegExp(`^students/(${UUID_PATTERN})/status$`, 'i');
+const ENROLLMENT_REVOKE_RE = new RegExp(`^enrollments/(${UUID_PATTERN})/revoke$`, 'i');
+const COURSE_MODULES_RE = new RegExp(`^courses/(${UUID_PATTERN})/modules$`, 'i');
+const COURSE_BY_ID_RE = new RegExp(`^courses/(${UUID_PATTERN})$`, 'i');
+const MODULE_LESSONS_RE = new RegExp(`^modules/(${UUID_PATTERN})/lessons$`, 'i');
+const MODULE_BY_ID_RE = new RegExp(`^modules/(${UUID_PATTERN})$`, 'i');
+const LESSON_EDITOR_RE = new RegExp(`^lessons/(${UUID_PATTERN})/editor$`, 'i');
+const LESSON_BY_ID_RE = new RegExp(`^lessons/(${UUID_PATTERN})$`, 'i');
+const BLOCK_BY_ID_RE = new RegExp(`^blocks/(${UUID_PATTERN})$`, 'i');
 
 export async function handleAdminRoute(
   req: ApiRequest,
@@ -29,6 +42,16 @@ export async function handleAdminRoute(
   // CRITICAL SECURITY GATE: Every single /api/admin/* request is server-verified
   // against Supabase JWT + PostgreSQL user_roles(role='admin') + account_status='active'.
   const { audit } = await requireAdmin(req, repo);
+
+  const allowed = await repo.checkRateLimit(
+    `admin:${audit.actorId ?? req.ip}`,
+    'admin_api',
+    60,
+    180,
+  );
+  if (!allowed) {
+    throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Çox tez-tez admin sorğusu göndərirsiniz.');
+  }
 
   const subPath = req.pathname.replace(/^\/api\/admin\/?/, '').replace(/\/$/, '');
 
@@ -49,7 +72,7 @@ export async function handleAdminRoute(
     return;
   }
 
-  const reviewMatch = subPath.match(/^applications\/([0-9a-f-]+)\/review$/i);
+  const reviewMatch = subPath.match(APP_REVIEW_RE);
   if (req.method === 'POST' && reviewMatch) {
     const input = applicationReviewSchema.parse(req.body);
     const updated = await repo.reviewApplication(reviewMatch[1]!, input, audit);
@@ -57,7 +80,7 @@ export async function handleAdminRoute(
     return;
   }
 
-  const noteMatch = subPath.match(/^applications\/([0-9a-f-]+)\/notes$/i);
+  const noteMatch = subPath.match(APP_NOTES_RE);
   if (req.method === 'POST' && noteMatch) {
     const input = applicationNoteSchema.parse(req.body);
     const note = await repo.addApplicationNote(noteMatch[1]!, input.note, audit);
@@ -75,7 +98,7 @@ export async function handleAdminRoute(
     return;
   }
 
-  const studentStatusMatch = subPath.match(/^students\/([0-9a-f-]+)\/status$/i);
+  const studentStatusMatch = subPath.match(STUDENT_STATUS_RE);
   if (req.method === 'PATCH' && studentStatusMatch) {
     const input = studentAccountStatusSchema.parse(req.body);
     const updated = await repo.updateStudentAccountStatus(
@@ -105,7 +128,7 @@ export async function handleAdminRoute(
     return;
   }
 
-  const revokeMatch = subPath.match(/^enrollments\/([0-9a-f-]+)\/revoke$/i);
+  const revokeMatch = subPath.match(ENROLLMENT_REVOKE_RE);
   if (req.method === 'POST' && revokeMatch) {
     const input = revokeEnrollmentSchema.parse(req.body ?? {});
     const updated = await repo.revokeEnrollment(revokeMatch[1]!, input.revoke_reason, audit);
@@ -127,14 +150,14 @@ export async function handleAdminRoute(
     return;
   }
 
-  const courseModulesMatch = subPath.match(/^courses\/([0-9a-f-]+)\/modules$/i);
+  const courseModulesMatch = subPath.match(COURSE_MODULES_RE);
   if (req.method === 'GET' && courseModulesMatch) {
     const modules = await repo.listCourseModules(courseModulesMatch[1]!);
     sendJson(res, 200, modules);
     return;
   }
 
-  const courseByIdMatch = subPath.match(/^courses\/([0-9a-f-]+)$/i);
+  const courseByIdMatch = subPath.match(COURSE_BY_ID_RE);
   if (req.method === 'PATCH' && courseByIdMatch) {
     const input = coursePatchSchema.parse(req.body);
     const updated = await repo.updateCourse(courseByIdMatch[1]!, input, audit);
@@ -150,14 +173,14 @@ export async function handleAdminRoute(
     return;
   }
 
-  const moduleLessonsMatch = subPath.match(/^modules\/([0-9a-f-]+)\/lessons$/i);
+  const moduleLessonsMatch = subPath.match(MODULE_LESSONS_RE);
   if (req.method === 'GET' && moduleLessonsMatch) {
     const lessons = await repo.listModuleLessons(moduleLessonsMatch[1]!);
     sendJson(res, 200, lessons);
     return;
   }
 
-  const moduleByIdMatch = subPath.match(/^modules\/([0-9a-f-]+)$/i);
+  const moduleByIdMatch = subPath.match(MODULE_BY_ID_RE);
   if (req.method === 'PATCH' && moduleByIdMatch) {
     const input = modulePatchSchema.parse(req.body);
     const updated = await repo.updateModule(moduleByIdMatch[1]!, input, audit);
@@ -173,14 +196,14 @@ export async function handleAdminRoute(
     return;
   }
 
-  const lessonEditorMatch = subPath.match(/^lessons\/([0-9a-f-]+)\/editor$/i);
+  const lessonEditorMatch = subPath.match(LESSON_EDITOR_RE);
   if (req.method === 'GET' && lessonEditorMatch) {
     const editorData = await repo.listLessonBlocksAdmin(lessonEditorMatch[1]!);
     sendJson(res, 200, editorData);
     return;
   }
 
-  const lessonByIdMatch = subPath.match(/^lessons\/([0-9a-f-]+)$/i);
+  const lessonByIdMatch = subPath.match(LESSON_BY_ID_RE);
   if (req.method === 'PATCH' && lessonByIdMatch) {
     const input = lessonPatchSchema.parse(req.body);
     const updated = await repo.updateLesson(lessonByIdMatch[1]!, input, audit);
@@ -195,7 +218,7 @@ export async function handleAdminRoute(
     return;
   }
 
-  const blockByIdMatch = subPath.match(/^blocks\/([0-9a-f-]+)$/i);
+  const blockByIdMatch = subPath.match(BLOCK_BY_ID_RE);
   if (req.method === 'PATCH' && blockByIdMatch) {
     const input = contentBlockPatchSchema.parse(req.body);
     const updated = await repo.updateContentBlock(blockByIdMatch[1]!, input, audit);

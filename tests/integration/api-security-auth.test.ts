@@ -110,7 +110,7 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
 
   it('prevents students from altering account_status or accessing admin routes', async () => {
     const pendingToken = await loginAs('pending@kodera.local', 'StudentPass123!');
-    const tamperRes = await callApi({
+    const pendingProfileRes = await callApi({
       method: 'PATCH',
       url: '/api/student/profile',
       token: pendingToken,
@@ -119,9 +119,20 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
         account_status: 'active',
       },
     });
-    expect(tamperRes.status).toBe(400);
+    expect(pendingProfileRes.status).toBe(403);
 
     const studentToken = await loginAs('student@kodera.local', 'StudentPass123!');
+    const activeTamperRes = await callApi({
+      method: 'PATCH',
+      url: '/api/student/profile',
+      token: studentToken,
+      body: {
+        full_name: 'Tural Əliyev',
+        account_status: 'suspended',
+      },
+    });
+    expect(activeTamperRes.status).toBe(400);
+
     const enrollAttempt = await callApi({
       method: 'POST',
       url: '/api/admin/enrollments',
