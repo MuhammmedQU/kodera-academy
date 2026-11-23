@@ -13,5 +13,5 @@
 | ID | Məsələ | Prioritet | Plan |
 | :---: | :--- | :---: | :--- |
 | **TECH-01** | ~~Production build əsas JS chunk ölçüsü 522 kB~~ | **HƏLL EDİLDİ** | Faza 9-da `React.lazy` + `vite.config.ts` `manualChunks` tətbiq edildi |
-| **TECH-02** | `devDependencies`-də `vitest` 3.x transitiv `@vitest/mocker` dev xəbərdarlığı (prod bundle-a daxil deyil) | Aşağı | Faza 10 QA auditində `vitest` yenilənməsi sınaqdan keçiriləcək |
+| **TECH-02** | ~~`devDependencies`-də `vitest` 3.x transitiv xəbərdarlığı~~ | **HƏLL EDİLDİ** | Faza 10-da `vitest@5.1.1`-ə yeniləndi → `npm audit` 0 vulnerability |
 | **LIM-01** | Brauzerdə Pyodide icrası zamanı görünən test halları DevTools-da görünə bilər | Məhdudiyyət | Öyrənmə məşqləri üçün uyğundur; gələcəkdə imtahanlar üçün ayrıca izolyasiya olunmuş server sandbox əlavə oluna bilər |

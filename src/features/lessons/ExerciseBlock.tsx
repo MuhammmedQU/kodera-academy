@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui';
+import { apiRequest } from '@/lib/apiClient';
 import { resetSharedPythonRunner } from '@/features/python-runner/pythonRunner';
 
 export interface PythonRunOutcome {
@@ -61,7 +62,6 @@ export function ExerciseBlock({
 
       if (canSaveAttempt) {
         const passedTests = res.testResults.filter((t) => t.passed).length;
-        const { apiRequest } = await import('@/lib/apiClient');
         const saved = await apiRequest<ExerciseAttemptSummary>(
           `/api/student/exercises/${exercise.id}/attempts`,
           {

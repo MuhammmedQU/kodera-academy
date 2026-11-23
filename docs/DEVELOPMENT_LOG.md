@@ -40,3 +40,8 @@
 - Tam Ana Səhifə, Kurslar Kataloqu, Kurs Detalları, İctimai Dərs Oxuyucu (+ Modul 2 sonu Qeydiyyat Dəvəti), Haqqımızda, Məxfilik və İstifadə Şərtləri tamamlandı.
 - `vite.config.ts`-də `manualChunks` əlavə edildi (`TECH-01` həll olundu).
 - `typecheck`, `lint` (0 xəta, 0 xəbərdarlıq), `vitest` (31/31 test), `security:check`, `build` tam keçdi.
+
+## 2026-11-24 — Faza 10: Təhlükəsizlik və Keyfiyyət Auditi (QA)
+- `security-audit-extended.test.ts` (SQLi, Zod, Prod sandbox bloklama, 6 SQL miqrasiya & 23 cədvəl RLS statik audit) və `tests/e2e/kodera-e2e.spec.ts` (4 real Chrome Playwright axını) yazıldı.
+- `PublicLayout.tsx` əlçatanlıq (`<a><button>`), `dev-sandbox.mjs` `DEP0190` və `vitest@5.1.1` yenilənməsi (`npm audit` → **0 vulnerability**) tamamlandı.
+- 35/35 Vitest + 4/4 Chrome Playwright E2E + `typecheck` + `lint` + `security:check` + `build` tam keçdi.

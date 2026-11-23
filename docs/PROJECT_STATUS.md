@@ -14,9 +14,9 @@
 | 6 | Tələbə Paneli və LMS | Tamamlandı | [06-phase-6-student-lms-report.md](06-phase-6-student-lms-report.md) |
 | 7 | İnteraktiv Python Mühiti (Pyodide) | Tamamlandı | [07-phase-7-python-runner-report.md](07-phase-7-python-runner-report.md) |
 | 8 | İlk İki Python Modulunun Məzmunu | Tamamlandı | [08-phase-8-python-content-report.md](08-phase-8-python-content-report.md) |
-| 9 | İctimai Vebsayt və Marketinq Təcrübəsi | **Tamamlandı** | [09-phase-9-public-website-report.md](09-phase-9-public-website-report.md) |
-| 10 | Təhlükəsizlik və Keyfiyyət Auditi (QA) | İcra olunur | — |
-| 11 | Deployment Hazırlığı | Gözləyir | — |
+| 9 | İctimai Vebsayt və Marketinq Təcrübəsi | Tamamlandı | [09-phase-9-public-website-report.md](09-phase-9-public-website-report.md) |
+| 10 | Təhlükəsizlik və Keyfiyyət Auditi (QA) | **Tamamlandı** | [10-phase-10-qa-security-report.md](10-phase-10-qa-security-report.md) |
+| 11 | Deployment Hazırlığı | İcra olunur | — |
 
 ## Aktiv Mühit Bloklayıcıları (Xarici Resurslar)
 - Real `kodera-dev` və `kodera-prod` Supabase layihə açarları hələ `.env.local`-a əlavə edilməyib (inkişaf lokal təhlükəsiz sandbox + avtomatlaşdırılmış testlərlə davam edir; canlı Supabase RLS yoxlaması açarlar əlavə olunduqda icra ediləcək).

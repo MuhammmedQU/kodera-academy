@@ -1,6 +1,8 @@
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 const args = process.argv.slice(2);
+const viteBin = path.resolve(process.cwd(), 'node_modules/vite/bin/vite.js');
 const env = {
   ...process.env,
   NODE_ENV: 'development',
@@ -8,11 +10,9 @@ const env = {
   VITE_LOCAL_SANDBOX: 'true',
 };
 
-const isWin = process.platform === 'win32';
-const child = spawn(isWin ? 'npx.cmd' : 'npx', ['vite', ...args], {
+const child = spawn(process.execPath, [viteBin, ...args], {
   stdio: 'inherit',
   env,
-  shell: isWin,
 });
 
 child.on('exit', (code) => {

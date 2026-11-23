@@ -56,24 +56,27 @@ export function PublicLayout() {
             {user ? (
               <>
                 {user.isAdmin ? (
-                  <Link to="/admin">
-                    <Button variant="secondary" size="sm">
-                      <ShieldCheck className="h-4 w-4" />
-                      Admin Panel
-                    </Button>
+                  <Link
+                    to="/admin"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#18181B] px-3.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#27272A]"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Admin Panel
                   </Link>
                 ) : user.isActiveStudent ? (
-                  <Link to="/dashboard">
-                    <Button variant="primary" size="sm">
-                      <LayoutDashboard className="h-4 w-4" />
-                      Tələbə Paneli
-                    </Button>
+                  <Link
+                    to="/dashboard"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#4338CA] px-3.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#3730A3]"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Tələbə Paneli
                   </Link>
                 ) : (
-                  <Link to="/application-status">
-                    <Button variant="outline" size="sm">
-                      Müraciət Statusu
-                    </Button>
+                  <Link
+                    to="/application-status"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3.5 text-sm font-semibold text-[#18181B] transition-colors hover:bg-zinc-50"
+                  >
+                    Müraciət Statusu
                   </Link>
                 )}
                 <Button variant="ghost" size="sm" onClick={handleLogout} aria-label="Çıxış">
@@ -83,16 +86,18 @@ export function PublicLayout() {
               </>
             ) : (
               <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">
-                    Daxil ol
-                  </Button>
+                <Link
+                  to="/login"
+                  className="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-[#18181B]"
+                >
+                  Daxil ol
                 </Link>
                 {settings.registration_enabled && (
-                  <Link to="/register">
-                    <Button variant="primary" size="sm">
-                      Qeydiyyat
-                    </Button>
+                  <Link
+                    to="/register"
+                    className="inline-flex h-9 items-center rounded-lg bg-[#4338CA] px-3.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#3730A3]"
+                  >
+                    Qeydiyyat
                   </Link>
                 )}
               </>
