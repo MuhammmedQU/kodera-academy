@@ -149,6 +149,24 @@ export const courseUpsertSchema = z
   })
   .strict();
 
+export const coursePatchSchema = z
+  .object({
+    slug: z.string().trim().toLowerCase().regex(slugRegex).optional(),
+    locale: z.enum(['az', 'en']).optional(),
+    title: z.string().trim().min(2).max(160).optional(),
+    subtitle: z.string().trim().max(280).nullable().optional(),
+    description: z.string().trim().min(10).max(5000).optional(),
+    learning_objectives: z.array(z.string().trim().min(2).max(300)).optional(),
+    target_audience: z.string().trim().max(1000).nullable().optional(),
+    programming_language: z.string().trim().toLowerCase().min(1).max(40).optional(),
+    difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+    estimated_duration_minutes: z.coerce.number().int().min(0).max(100000).optional(),
+    cover_image_path: z.string().trim().max(500).nullable().optional(),
+    sort_order: z.coerce.number().int().min(0).optional(),
+    status: z.enum(['draft', 'published', 'archived']).optional(),
+  })
+  .strict();
+
 export const moduleUpsertSchema = z
   .object({
     course_id: z.string().uuid(),
@@ -161,6 +179,17 @@ export const moduleUpsertSchema = z
   })
   .strict();
 
+export const modulePatchSchema = z
+  .object({
+    slug: z.string().trim().toLowerCase().regex(slugRegex).optional(),
+    title: z.string().trim().min(2).max(160).optional(),
+    description: z.string().trim().max(1000).nullable().optional(),
+    sort_order: z.coerce.number().int().min(0).optional(),
+    is_public: z.boolean().optional(),
+    status: z.enum(['draft', 'published', 'archived']).optional(),
+  })
+  .strict();
+
 export const lessonUpsertSchema = z
   .object({
     module_id: z.string().uuid(),
@@ -170,6 +199,26 @@ export const lessonUpsertSchema = z
     estimated_minutes: z.coerce.number().int().min(1).max(300).default(10),
     sort_order: z.coerce.number().int().min(0),
     status: z.enum(['draft', 'published', 'archived']).default('draft'),
+  })
+  .strict();
+
+export const lessonPatchSchema = z
+  .object({
+    slug: z.string().trim().toLowerCase().regex(slugRegex).optional(),
+    title: z.string().trim().min(2).max(180).optional(),
+    summary: z.string().trim().max(1000).nullable().optional(),
+    estimated_minutes: z.coerce.number().int().min(1).max(300).optional(),
+    sort_order: z.coerce.number().int().min(0).optional(),
+    status: z.enum(['draft', 'published', 'archived']).optional(),
+  })
+  .strict();
+
+export const contentBlockPatchSchema = z
+  .object({
+    sort_order: z.coerce.number().int().min(0).optional(),
+    title: z.string().trim().max(180).nullable().optional(),
+    content: z.record(z.string(), z.unknown()).optional(),
+    is_published: z.boolean().optional(),
   })
   .strict();
 

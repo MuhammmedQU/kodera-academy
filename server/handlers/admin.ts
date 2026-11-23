@@ -3,10 +3,14 @@ import {
   applicationNoteSchema,
   applicationReviewSchema,
   assignEnrollmentSchema,
+  contentBlockPatchSchema,
   contentBlockUpsertSchema,
+  coursePatchSchema,
   courseUpsertSchema,
   exerciseUpsertSchema,
+  lessonPatchSchema,
   lessonUpsertSchema,
+  modulePatchSchema,
   moduleUpsertSchema,
   platformSettingsUpdateSchema,
   quizUpsertSchema,
@@ -132,7 +136,7 @@ export async function handleAdminRoute(
 
   const courseByIdMatch = subPath.match(/^courses\/([0-9a-f-]+)$/i);
   if (req.method === 'PATCH' && courseByIdMatch) {
-    const input = courseUpsertSchema.partial().parse(req.body);
+    const input = coursePatchSchema.parse(req.body);
     const updated = await repo.updateCourse(courseByIdMatch[1]!, input, audit);
     sendJson(res, 200, updated);
     return;
@@ -155,7 +159,7 @@ export async function handleAdminRoute(
 
   const moduleByIdMatch = subPath.match(/^modules\/([0-9a-f-]+)$/i);
   if (req.method === 'PATCH' && moduleByIdMatch) {
-    const input = moduleUpsertSchema.partial().parse(req.body);
+    const input = modulePatchSchema.parse(req.body);
     const updated = await repo.updateModule(moduleByIdMatch[1]!, input, audit);
     sendJson(res, 200, updated);
     return;
@@ -178,7 +182,7 @@ export async function handleAdminRoute(
 
   const lessonByIdMatch = subPath.match(/^lessons\/([0-9a-f-]+)$/i);
   if (req.method === 'PATCH' && lessonByIdMatch) {
-    const input = lessonUpsertSchema.partial().parse(req.body);
+    const input = lessonPatchSchema.parse(req.body);
     const updated = await repo.updateLesson(lessonByIdMatch[1]!, input, audit);
     sendJson(res, 200, updated);
     return;
@@ -193,7 +197,7 @@ export async function handleAdminRoute(
 
   const blockByIdMatch = subPath.match(/^blocks\/([0-9a-f-]+)$/i);
   if (req.method === 'PATCH' && blockByIdMatch) {
-    const input = contentBlockUpsertSchema.partial().parse(req.body);
+    const input = contentBlockPatchSchema.parse(req.body);
     const updated = await repo.updateContentBlock(blockByIdMatch[1]!, input, audit);
     sendJson(res, 200, updated);
     return;

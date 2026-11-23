@@ -57,6 +57,10 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
     return preParsed;
   }
 
+  if (typeof req.on !== 'function') {
+    return {};
+  }
+
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let total = 0;
