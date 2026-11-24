@@ -1,4 +1,10 @@
+import crypto from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
+
+const ephemeralSandboxSecret =
+  process.env.KODERA_SANDBOX_EPHEMERAL_SECRET ||
+  `Kdr_${crypto.randomBytes(12).toString('hex')}!9`;
+process.env.KODERA_SANDBOX_EPHEMERAL_SECRET = ephemeralSandboxSecret;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -24,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: 'node scripts/dev-sandbox.mjs --port 4173 --host 127.0.0.1',
     url: 'http://127.0.0.1:4173/api/health',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 });

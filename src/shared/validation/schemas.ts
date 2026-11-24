@@ -412,6 +412,13 @@ export const platformSettingsUpdateSchema = z
     academy_name: z.string().trim().min(2).max(100),
     academy_tagline: z.string().trim().min(2).max(240),
     logo_storage_path: z.string().trim().max(500).nullable().optional(),
+    admin_login_email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email('Düzgün administrator giriş emaili daxil edin.')
+      .optional()
+      .default('koderaaz@gmail.com'),
     contact_email: z
       .string()
       .trim()

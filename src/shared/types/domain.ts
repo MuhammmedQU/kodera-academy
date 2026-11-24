@@ -90,6 +90,7 @@ export interface PublicPlatformSettings {
 }
 
 export interface AdminPlatformSettings extends PublicPlatformSettings {
+  admin_login_email: string;
   email_sender_name: string;
   website_domain: string | null;
   raw_whatsapp_button_enabled: boolean;

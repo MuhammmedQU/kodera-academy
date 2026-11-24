@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 const errors = [];
+const FORBIDDEN_DEMO_SECRET_RE = new RegExp(['Admin' + 'Pass123!', 'Student' + 'Pass123!'].join('|'));
 
 function walkFiles(dir, extensions) {
   const results = [];
@@ -41,8 +42,19 @@ for (const file of walkFiles(path.join(ROOT, 'src'), ['.ts', '.tsx', '.js', '.js
   if (/\.innerHTML\s*=/.test(content)) {
     errors.push(`[XSS-RISK] ${rel} assigns directly to innerHTML.`);
   }
-  if (content.includes('AdminPass123!') || content.includes('StudentPass123!')) {
+  if (FORBIDDEN_DEMO_SECRET_RE.test(content)) {
     errors.push(`[DEV-CREDENTIAL] ${rel} contains hardcoded sandbox test passwords in frontend src/.`);
+  }
+}
+
+// 1b. Check server/, api/, tests/, supabase/, and docs/ for hardcoded demo passwords
+for (const dirName of ['server', 'api', 'tests', 'supabase', 'docs']) {
+  for (const file of walkFiles(path.join(ROOT, dirName), ['.ts', '.tsx', '.js', '.mjs', '.sql', '.md'])) {
+    const content = fs.readFileSync(file, 'utf8');
+    const rel = path.relative(ROOT, file);
+    if (FORBIDDEN_DEMO_SECRET_RE.test(content)) {
+      errors.push(`[DEV-CREDENTIAL] ${rel} contains a hardcoded demo password literal.`);
+    }
   }
 }
 
@@ -60,7 +72,7 @@ if (fs.existsSync(path.join(ROOT, 'dist'))) {
     if (/eyJhbGciOi[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/.test(content)) {
       errors.push(`[BUNDLE-LEAK] Built asset ${rel} contains a hardcoded JWT token.`);
     }
-    if (content.includes('AdminPass123!') || content.includes('StudentPass123!')) {
+    if (FORBIDDEN_DEMO_SECRET_RE.test(content)) {
       errors.push(`[BUNDLE-LEAK] Built production asset ${rel} leaked dev sandbox password.`);
     }
   }

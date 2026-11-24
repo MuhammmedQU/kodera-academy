@@ -5,7 +5,7 @@ import {
   registerSchema,
   resendVerificationSchema,
 } from '../../src/shared/validation/schemas.js';
-import { requireAuthenticated } from '../lib/auth.js';
+import { requireAdmin, requireAuthenticated } from '../lib/auth.js';
 import { getBearerToken, HttpError, sendJson, type ApiRequest } from '../lib/http.js';
 import type { KoderaRepository } from '../lib/repository.js';
 
@@ -59,7 +59,7 @@ export async function handleAuthRoute(
     return;
   }
 
-  // POST /api/auth/login (strictly dev/test sandbox fallback when Supabase Auth is not connected)
+  // POST /api/auth/login (Exclusively Student login in local sandbox mode; rejects admin accounts)
   if (req.method === 'POST' && subPath === 'login') {
     if (!repo.loginSandbox) {
       throw new HttpError(
@@ -68,13 +68,94 @@ export async function handleAuthRoute(
         'Giriş birbaşa Supabase Auth müştərisi vasitəsilə icra olunmalıdır.',
       );
     }
-    const allowed = await repo.checkRateLimit(`login:ip:${req.ip}`, 'login', 300, 20);
-    if (!allowed) {
-      throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Çox sayda giriş cəhdi edildi.');
+    const allowedByIp = await repo.checkRateLimit(`login:ip:${req.ip}`, 'login', 300, 20);
+    if (!allowedByIp) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Çox sayda giriş cəhdi edildi. Bir az sonra yenidən yoxlayın.',
+      );
     }
     const input = loginSchema.parse(req.body);
+    const allowedByEmail = await repo.checkRateLimit(
+      `login:email:${input.email}`,
+      'login',
+      300,
+      10,
+    );
+    if (!allowedByEmail) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Çox sayda giriş cəhdi edildi. Bir az sonra yenidən yoxlayın.',
+      );
+    }
     const result = await repo.loginSandbox(input.email, input.password);
+    if (result.user.isAdmin) {
+      if (repo.logoutSandbox) {
+        await repo.logoutSandbox(result.access_token);
+      }
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır.');
+    }
     sendJson(res, 200, result);
+    return;
+  }
+
+  // POST /api/auth/admin-login (Dedicated Admin login in local sandbox mode; rejects student accounts)
+  if (req.method === 'POST' && subPath === 'admin-login') {
+    if (!repo.loginSandbox) {
+      throw new HttpError(
+        405,
+        'USE_SUPABASE_AUTH',
+        'Admin girişi birbaşa Supabase Auth müştərisi vasitəsilə icra olunmalıdır.',
+      );
+    }
+    const allowedByIp = await repo.checkRateLimit(
+      `admin_login:ip:${req.ip}`,
+      'admin_login',
+      300,
+      10,
+    );
+    if (!allowedByIp) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Çox sayda administrator giriş cəhdi edildi. Bir az sonra yenidən yoxlayın.',
+      );
+    }
+    const input = loginSchema.parse(req.body);
+    const allowedByEmail = await repo.checkRateLimit(
+      `admin_login:email:${input.email}`,
+      'admin_login',
+      300,
+      5,
+    );
+    if (!allowedByEmail) {
+      throw new HttpError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        'Çox sayda administrator giriş cəhdi edildi. Bir az sonra yenidən yoxlayın.',
+      );
+    }
+    const result = await repo.loginSandbox(input.email, input.password);
+    if (!result.user.isAdmin || result.user.profile.account_status !== 'active') {
+      if (repo.logoutSandbox) {
+        await repo.logoutSandbox(result.access_token);
+      }
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır.');
+    }
+    sendJson(res, 200, result);
+    return;
+  }
+
+  // POST /api/auth/admin-verify (Server-side RBAC check after Supabase Auth admin login)
+  if (req.method === 'POST' && subPath === 'admin-verify') {
+    const allowed = await repo.checkRateLimit(`admin_verify:ip:${req.ip}`, 'admin_verify', 300, 20);
+    if (!allowed) {
+      throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Çox sayda sorğu göndərildi.');
+    }
+    const { user } = await requireAdmin(req, repo);
+    sendJson(res, 200, user);
     return;
   }
 

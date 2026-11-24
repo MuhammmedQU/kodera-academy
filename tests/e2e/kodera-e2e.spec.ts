@@ -1,9 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+const sandboxPassword = process.env.KODERA_SANDBOX_EPHEMERAL_SECRET!;
+
 test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Security Flows', () => {
-  test('Public visitor explores homepage, catalog, free Python Module 1 & 2, and is blocked from Module 3', async ({
+  test('Public visitor explores homepage, catalog, free Python Module 1 & 2, is blocked from Module 3, and unauthenticated /admin redirects to /admin/login', async ({
     page,
   }) => {
+    // Unauthenticated visitor accessing /admin is redirected to /admin/login
+    await page.goto('/admin');
+    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page.getByRole('heading', { name: /Administrator Girişi/i })).toBeVisible();
+
     await page.goto('/');
     await expect(page.getByRole('heading', { name: /Proqramlaşdırmanı sıfırdan/i })).toBeVisible();
 
@@ -37,6 +44,7 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
   test('New student registers -> PENDING status + WhatsApp prefilled link -> blocked from /dashboard and /admin -> Admin approves + assigns Python separately', async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     const uniqueEmail = `e2e.student.${Date.now()}@example.com`;
     const fullName = 'Samir Məmmədov';
 
@@ -76,12 +84,36 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await page.goto('/admin');
     await expect(page).toHaveURL(/\/application-status$/);
 
-    // 4. Logout and login as Admin
+    // 4. Logout -> verify /login is exclusively for students and rejects admin account -> login at /admin/login
     await page.getByRole('button', { name: /Çıxış/i }).click();
     await page.goto('/login');
-    await page.getByLabel(/Email ünvanı/i).fill('admin@kodera.local');
-    await page.getByLabel(/Şifrə/i).fill('AdminPass123!');
+    await expect(page.getByRole('heading', { name: /Tələbə Girişi/i })).toBeVisible();
+    await expect(page.locator('a[href="/admin/login"]')).toHaveCount(0);
+
+    // Admin attempting to log in through student /login is rejected
+    await page.getByLabel(/Email ünvanı/i).fill('koderaaz@gmail.com');
+    await page.getByLabel(/Şifrə/i).fill(sandboxPassword);
     await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
+    await expect(page.getByRole('alert')).toContainText(/Email və ya şifrə yanlışdır/i);
+    await expect(page).toHaveURL(/\/login$/);
+
+    // Student attempting to log in through /admin/login is rejected
+    await page.goto('/admin/login');
+    await expect(page.getByRole('heading', { name: /Administrator Girişi/i })).toBeVisible();
+    await page.getByLabel(/Administrator email ünvanı/i).fill('student@kodera.local');
+    await page.getByLabel(/Şifrə/i).fill(sandboxPassword);
+    await page.getByRole('main').getByRole('button', { name: /Admin panelinə daxil ol/i }).click();
+    await expect(page.getByRole('alert')).toContainText(/Email və ya şifrə yanlışdır/i);
+    await expect(page).toHaveURL(/\/admin\/login$/);
+
+    // Admin authenticates at /admin/login and redirects to /admin
+    await page.getByLabel(/Administrator email ünvanı/i).fill('koderaaz@gmail.com');
+    await page.getByLabel(/Şifrə/i).fill(sandboxPassword);
+    await page.getByRole('main').getByRole('button', { name: /Admin panelinə daxil ol/i }).click();
+    await expect(page).toHaveURL(/\/admin$/);
+
+    // Admin cannot use /dashboard as an alternative student interface -> redirected to /admin
+    await page.goto('/dashboard');
     await expect(page).toHaveURL(/\/admin$/);
 
     // Verify Admin Dashboard calculates real database-backed counts (1 newly registered pending student, 0 fake active students/enrollments)
@@ -126,11 +158,13 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await expect(page.getByTestId('stat-value-active_students')).toHaveText('1');
     await expect(page.getByTestId('stat-value-active_enrollments')).toHaveText('1');
 
-    // Verify Admin Settings 3 sections & official contact persistence
+    // Verify Admin Settings 3 sections & separate admin_login_email vs contact_email persistence
     await page.goto('/admin/settings');
     await expect(page.getByRole('heading', { name: /1\. Akademiya Məlumatları/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /2\. WhatsApp Əlaqə İnteqrasiyası/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /3\. E-poçt və Göndərən Tənzimləmələri/i })).toBeVisible();
+    await expect(page.getByLabel(/Administrator giriş emaili/i)).toHaveValue('koderaaz@gmail.com');
+    await expect(page.getByLabel(/İctimai tələbə əlaqə emaili/i)).toHaveValue('muhammed.ehmedov94@gmail.com');
     await expect(page.getByTestId('email-provider-status-badge')).toBeVisible();
     await page.getByRole('button', { name: /Tənzimləmələri yadda saxla/i }).click();
     await expect(
@@ -149,7 +183,7 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
   }) => {
     await page.goto('/login');
     await page.getByLabel(/Email ünvanı/i).fill('student@kodera.local');
-    await page.getByLabel(/Şifrə/i).fill('StudentPass123!');
+    await page.getByLabel(/Şifrə/i).fill(sandboxPassword);
     await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
 
@@ -223,7 +257,7 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
       }
     };
 
-    // 1. Public pages across Mobile, Tablet, Desktop (10 routes x 3 viewports = 30 checks)
+    // 1. Public & Auth pages across Mobile, Tablet, Desktop (11 routes x 3 viewports = 33 checks)
     const publicPaths = [
       '/',
       '/courses',
@@ -233,6 +267,7 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
       '/privacy',
       '/terms',
       '/login',
+      '/admin/login',
       '/register',
       '/forgot-password',
     ];
@@ -251,7 +286,7 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     // 2. Student Dashboard pages across Mobile, Tablet, Desktop + 404 inside /dashboard/*
     await page.goto('/login');
     await page.getByLabel(/Email ünvanı/i).fill('student@kodera.local');
-    await page.getByLabel(/Şifrə/i).fill('StudentPass123!');
+    await page.getByLabel(/Şifrə/i).fill(sandboxPassword);
     await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: /Xoş gəldiniz/i })).toBeVisible();
@@ -287,10 +322,10 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await expect(page.getByRole('link', { name: /Daxil ol/i }).first()).toBeVisible();
 
     // 3. Admin Dashboard pages across Mobile, Tablet, Desktop + 404 inside /admin/*
-    await page.goto('/login');
-    await page.getByLabel(/Email ünvanı/i).fill('admin@kodera.local');
-    await page.getByLabel(/Şifrə/i).fill('AdminPass123!');
-    await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
+    await page.goto('/admin/login');
+    await page.getByLabel(/Administrator email ünvanı/i).fill('koderaaz@gmail.com');
+    await page.getByLabel(/Şifrə/i).fill(sandboxPassword);
+    await page.getByRole('main').getByRole('button', { name: /Admin panelinə daxil ol/i }).click();
     await expect(page).toHaveURL(/\/admin$/);
 
     for (const admPath of [

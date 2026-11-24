@@ -1,34 +1,43 @@
 -- ============================================================================
--- KODERA ACADEMY — First Staging Admin Bootstrap (`kodera-dev`)
+-- KODERA ACADEMY — First Admin Account Bootstrap (`koderaaz@gmail.com`)
 -- ============================================================================
--- USAGE:
---   1. Run ALL 7 migrations (20261123000001..000007) and seed
---      (`supabase/seeds/01_python_intro_modules.sql`) FIRST.
---   2. Register your own admin email via the Staging UI (or create & confirm
---      the user in Supabase Dashboard -> Authentication -> Users).
---   3. Replace `ADMIN_EMAIL_HERE` below with your exact admin email address
---      and run this script ONCE in `kodera-dev` Supabase SQL Editor.
---   4. NEVER run this on `kodera-prod` without explicit production approval.
+-- SECURITY RULES:
+--   1. NO password is ever stored in this file, in SQL migrations, or in Git.
+--   2. Registering with `koderaaz@gmail.com` does NOT automatically grant admin
+--      privileges (the signup trigger always creates `role = 'student'`).
+--   3. First, create and confirm the `koderaaz@gmail.com` user in Supabase
+--      Dashboard -> Authentication -> Users -> Add User (with your private
+--      password and `Auto Confirm User` checked, or confirm via email link).
+--   4. Run this script ONCE in Supabase SQL Editor (`kodera-dev` or `kodera-prod`).
+--   5. This script verifies that `auth.users.email_confirmed_at IS NOT NULL`
+--      before promoting the account to `admin` and removes the `student` role
+--      so the admin account is strictly isolated from the student dashboard.
 -- ============================================================================
 
 BEGIN;
 
 DO $$
 DECLARE
-    v_target_email constant text := lower(btrim('ADMIN_EMAIL_HERE'));
-    v_user_id      uuid;
+    v_target_email   constant text := lower(btrim('koderaaz@gmail.com'));
+    v_user_id        uuid;
+    v_confirmed_at   timestamptz;
 BEGIN
-    IF v_target_email = '' OR v_target_email = 'admin_email_here' OR position('@' IN v_target_email) <= 1 THEN
-        RAISE EXCEPTION 'Replace ADMIN_EMAIL_HERE with your actual admin email address before running this script.';
-    END IF;
-
-    SELECT id
-      INTO v_user_id
-      FROM public.profiles
-     WHERE email = v_target_email;
+    SELECT u.id, u.email_confirmed_at
+      INTO v_user_id, v_confirmed_at
+      FROM auth.users u
+      JOIN public.profiles p ON p.id = u.id
+     WHERE lower(btrim(u.email)) = v_target_email;
 
     IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'No profile found for email %. Register or create the auth user first.', v_target_email;
+        RAISE EXCEPTION
+            'No user found in auth.users/public.profiles for %. Create the user in Supabase Authentication -> Users first.',
+            v_target_email;
+    END IF;
+
+    IF v_confirmed_at IS NULL THEN
+        RAISE EXCEPTION
+            'Account % is not email-verified yet (email_confirmed_at IS NULL). Confirm the user in Supabase Auth before promoting to admin.',
+            v_target_email;
     END IF;
 
     -- 1. Activate profile
@@ -37,16 +46,27 @@ BEGIN
            archived_at = NULL
      WHERE id = v_user_id;
 
-    -- 2. Grant active admin role (idempotent)
+    -- 2. Remove student role so admin account cannot use the student dashboard
+    DELETE FROM public.user_roles
+     WHERE user_id = v_user_id
+       AND role = 'student';
+
+    -- 3. Grant active admin role (idempotent)
     INSERT INTO public.user_roles (user_id, role, granted_by)
     VALUES (v_user_id, 'admin', v_user_id)
     ON CONFLICT (user_id, role) WHERE revoked_at IS NULL DO NOTHING;
 
-    -- 3. Remove any student signup application row for the admin account so it never appears in student applications
+    -- 4. Remove any pending student signup application row for the admin account
     DELETE FROM public.applications
      WHERE user_id = v_user_id;
 
-    -- 4. Record immutable audit entry
+    -- 5. Sync admin_login_email in platform_settings (without altering public contact_email)
+    UPDATE public.platform_settings
+       SET admin_login_email = v_target_email,
+           updated_by = v_user_id
+     WHERE id = true;
+
+    -- 6. Record immutable audit entry
     INSERT INTO public.audit_logs (actor_id, actor_role, action, entity_type, entity_id, metadata)
     VALUES (
         v_user_id,
@@ -54,10 +74,13 @@ BEGIN
         'admin.bootstrapped',
         'profile',
         v_user_id,
-        jsonb_build_object('email', v_target_email, 'environment', 'kodera-dev')
+        jsonb_build_object(
+            'admin_email', v_target_email,
+            'email_verified', true
+        )
     );
 
-    RAISE NOTICE 'Successfully promoted % (%) to active Kodera admin.', v_target_email, v_user_id;
+    RAISE NOTICE 'Successfully promoted verified account % (%) to active Kodera Academy administrator.', v_target_email, v_user_id;
 END $$;
 
 COMMIT;

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LogIn } from 'lucide-react';
+import { GraduationCap, LogIn } from 'lucide-react';
 import { loginSchema, type LoginInput } from '@shared/validation/schemas';
 import {
   Alert,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -30,7 +31,8 @@ function parseAuthRedirectNotice(search: string, hash: string): {
   if (errorCode === 'otp_expired' || error === 'access_denied') {
     return {
       type: 'error',
-      message: 'Email təsdiq linkinin vaxtı bitib və ya etibarsızdır. Yenidən giriş və ya təsdiq linki istəyin.',
+      message:
+        'Email təsdiq linkinin vaxtı bitib və ya etibarsızdır. Yenidən giriş və ya təsdiq linki istəyin.',
     };
   }
   if (error) {
@@ -61,7 +63,7 @@ export function LoginPage() {
   useEffect(() => {
     if (isLoading || !user) return;
     if (user.isAdmin) {
-      navigate(from?.startsWith('/admin') ? from : '/admin', { replace: true });
+      navigate('/admin', { replace: true });
     } else if (user.isActiveStudent) {
       navigate(from?.startsWith('/dashboard') ? from : '/dashboard', { replace: true });
     } else {
@@ -82,9 +84,7 @@ export function LoginPage() {
     setServerError(null);
     try {
       const signedIn = await login(values);
-      if (signedIn.isAdmin) {
-        navigate(from?.startsWith('/admin') ? from : '/admin', { replace: true });
-      } else if (signedIn.isActiveStudent) {
+      if (signedIn.isActiveStudent) {
         navigate(from?.startsWith('/dashboard') ? from : '/dashboard', { replace: true });
       } else {
         navigate('/application-status', { replace: true });
@@ -101,9 +101,13 @@ export function LoginPage() {
   return (
     <div className="mx-auto max-w-md px-4 py-12 sm:py-20">
       <div className="mb-6 text-center">
-        <h1 className="font-display text-3xl font-extrabold text-[#18181B]">Hesaba Giriş</h1>
+        <Badge variant="brand" className="mb-3">
+          <GraduationCap className="h-3.5 w-3.5" />
+          Tələbə Portalı
+        </Badge>
+        <h1 className="font-display text-3xl font-extrabold text-[#18181B]">Tələbə Girişi</h1>
         <p className="mt-2 text-sm text-zinc-600">
-          Kurslarınıza və ya müraciət statusunuza baxmaq üçün daxil olun.
+          Kurslarınıza və ya müraciət statusunuza baxmaq üçün tələbə hesabınıza daxil olun.
         </p>
       </div>
 

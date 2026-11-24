@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getEphemeralSandboxPassword } from '@server/dev/localSandboxRepository';
 import { SEED_IDS } from '@server/content/initialSeed';
-import { callApi, createTestSandbox, loginAs } from './testHttp';
+import { callApi, createTestSandbox, loginAdminAs, loginAs } from './testHttp';
 
 describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration Tests', () => {
   beforeEach(() => {
@@ -86,22 +87,22 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
     expect(anonRes.status).toBe(403);
 
     // PENDING
-    const pendingToken = await loginAs('pending@kodera.local', 'StudentPass123!');
+    const pendingToken = await loginAs('pending@kodera.local');
     expect((await callApi({ url: restrictedUrl, token: pendingToken })).status).toBe(403);
     expect((await callApi({ url: '/api/student/courses', token: pendingToken })).status).toBe(403);
 
     // REJECTED
-    const rejectedToken = await loginAs('rejected@kodera.local', 'StudentPass123!');
+    const rejectedToken = await loginAs('rejected@kodera.local');
     expect((await callApi({ url: restrictedUrl, token: rejectedToken })).status).toBe(403);
     expect((await callApi({ url: '/api/student/courses', token: rejectedToken })).status).toBe(403);
 
     // SUSPENDED (even though Python enrollment exists!)
-    const suspendedToken = await loginAs('suspended@kodera.local', 'StudentPass123!');
+    const suspendedToken = await loginAs('suspended@kodera.local');
     expect((await callApi({ url: restrictedUrl, token: suspendedToken })).status).toBe(403);
     expect((await callApi({ url: '/api/student/courses', token: suspendedToken })).status).toBe(403);
 
     // APPROVED with 0 assigned courses
-    const noCourseToken = await loginAs('approved-nocourse@kodera.local', 'StudentPass123!');
+    const noCourseToken = await loginAs('approved-nocourse@kodera.local');
     expect((await callApi({ url: restrictedUrl, token: noCourseToken })).status).toBe(403);
     const emptyCourses = await callApi({ url: '/api/student/courses', token: noCourseToken });
     expect(emptyCourses.status).toBe(200);
@@ -109,7 +110,7 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
   });
 
   it('prevents students from altering account_status or accessing admin routes', async () => {
-    const pendingToken = await loginAs('pending@kodera.local', 'StudentPass123!');
+    const pendingToken = await loginAs('pending@kodera.local');
     const pendingProfileRes = await callApi({
       method: 'PATCH',
       url: '/api/student/profile',
@@ -121,7 +122,7 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
     });
     expect(pendingProfileRes.status).toBe(403);
 
-    const studentToken = await loginAs('student@kodera.local', 'StudentPass123!');
+    const studentToken = await loginAs('student@kodera.local');
     const activeTamperRes = await callApi({
       method: 'PATCH',
       url: '/api/student/profile',
@@ -164,7 +165,7 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
   });
 
   it('masks WhatsApp phone number in public settings when admin disables the button', async () => {
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
 
     const before = await callApi({ url: '/api/public/settings' });
     const beforeData = (
@@ -194,6 +195,7 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
         academy_name: 'Kodera Academy',
         academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
         logo_storage_path: null,
+        admin_login_email: 'koderaaz@gmail.com',
         contact_email: 'muhammed.ehmedov94@gmail.com',
         email_sender_name: 'Kodera Academy',
         website_domain: null,
@@ -215,5 +217,70 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
     }).data;
     expect(afterData.whatsapp_button_enabled).toBe(false);
     expect(afterData.whatsapp_phone).toBeNull();
+  });
+
+  it('strictly separates student login (/api/auth/login) and admin login (/api/auth/admin-login) and separates admin_login_email from public contact_email', async () => {
+    const secret = getEphemeralSandboxPassword();
+
+    // 1. Admin account (koderaaz@gmail.com) is rejected on student login endpoint (/api/auth/login)
+    const adminOnStudentLogin = await callApi({
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { email: 'koderaaz@gmail.com', password: secret },
+    });
+    expect(adminOnStudentLogin.status).toBe(401);
+
+    // 2. Student account (student@kodera.local) is rejected on admin login endpoint (/api/auth/admin-login)
+    const studentOnAdminLogin = await callApi({
+      method: 'POST',
+      url: '/api/auth/admin-login',
+      body: { email: 'student@kodera.local', password: secret },
+    });
+    expect(studentOnAdminLogin.status).toBe(401);
+
+    // 3. Student token is rejected on /api/auth/admin-verify (403)
+    const studentToken = await loginAs('student@kodera.local');
+    const studentAdminVerify = await callApi({
+      method: 'POST',
+      url: '/api/auth/admin-verify',
+      token: studentToken,
+    });
+    expect(studentAdminVerify.status).toBe(403);
+
+    // 4. Admin token succeeds on /api/auth/admin-verify (200) and is rejected on student dashboard endpoints (403)
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
+    const adminVerify = await callApi({
+      method: 'POST',
+      url: '/api/auth/admin-verify',
+      token: adminToken,
+    });
+    expect(adminVerify.status).toBe(200);
+
+    const adminOnStudentCourses = await callApi({
+      url: '/api/student/courses',
+      token: adminToken,
+    });
+    expect(adminOnStudentCourses.status).toBe(403);
+
+    // 5. Admin settings contains admin_login_email='koderaaz@gmail.com' and contact_email='muhammed.ehmedov94@gmail.com',
+    // while public settings NEVER exposes admin_login_email
+    const adminSettingsRes = await callApi({
+      url: '/api/admin/settings',
+      token: adminToken,
+    });
+    expect(adminSettingsRes.status).toBe(200);
+    const adminSettings = (
+      adminSettingsRes.body as {
+        data: { admin_login_email: string; contact_email: string; email_sender_name: string };
+      }
+    ).data;
+    expect(adminSettings.admin_login_email).toBe('koderaaz@gmail.com');
+    expect(adminSettings.contact_email).toBe('muhammed.ehmedov94@gmail.com');
+    expect(adminSettings.email_sender_name).toBe('Kodera Academy');
+
+    const publicSettingsRes = await callApi({ url: '/api/public/settings' });
+    const publicSettings = (publicSettingsRes.body as { data: Record<string, unknown> }).data;
+    expect(publicSettings.contact_email).toBe('muhammed.ehmedov94@gmail.com');
+    expect(publicSettings).not.toHaveProperty('admin_login_email');
   });
 });

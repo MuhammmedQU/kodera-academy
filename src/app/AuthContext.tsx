@@ -27,6 +27,7 @@ interface AuthContextValue {
   acknowledgeLogout: () => void;
   refreshUser: () => Promise<AuthSessionUser | null>;
   login: (input: LoginInput) => Promise<AuthSessionUser>;
+  loginAdmin: (input: LoginInput) => Promise<AuthSessionUser>;
   register: (input: RegisterInput) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 }
@@ -128,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (input: LoginInput): Promise<AuthSessionUser> => {
+      setJustLoggedOut(false);
       const supabase = getSupabaseClient();
       if (supabase) {
         const { error } = await supabase.auth.signInWithPassword({
@@ -150,12 +152,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!me) {
           throw new Error('Hesab məlumatları yüklənə bilmədi.');
         }
+        // Student login (/login) is exclusively for students; reject admin accounts here
+        if (me.isAdmin) {
+          await supabase.auth.signOut().catch(() => {});
+          setUser(null);
+          throw new Error('Email və ya şifrə yanlışdır.');
+        }
         return me;
       }
 
       if (clientEnv.isLocalSandbox) {
         const res = await apiRequest<{ access_token: string; user: AuthSessionUser }>(
           '/api/auth/login',
+          { method: 'POST', body: input, auth: false },
+        );
+        setSandboxToken(res.access_token);
+        setUser(res.user);
+        return res.user;
+      }
+
+      throw new Error(
+        'Autentifikasiya servisi (Supabase) hələ konfiqurasiya edilməyib. .env.local faylını yoxlayın.',
+      );
+    },
+    [refreshUser],
+  );
+
+  const loginAdmin = useCallback(
+    async (input: LoginInput): Promise<AuthSessionUser> => {
+      setJustLoggedOut(false);
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: input.email,
+          password: input.password,
+        });
+        if (error) {
+          const msg = error.message.toLowerCase();
+          if (msg.includes('too many requests') || msg.includes('rate limit')) {
+            throw new Error(
+              'Çox sayda administrator giriş cəhdi edildi. Bir az sonra yenidən yoxlayın.',
+            );
+          }
+          throw new Error('Email və ya şifrə yanlışdır.');
+        }
+        try {
+          await apiRequest<AuthSessionUser>('/api/auth/admin-verify', {
+            method: 'POST',
+            auth: true,
+          });
+        } catch {
+          await supabase.auth.signOut().catch(() => {});
+          setUser(null);
+          throw new Error('Email və ya şifrə yanlışdır.');
+        }
+        const me = await refreshUser();
+        if (!me || !me.isAdmin) {
+          await supabase.auth.signOut().catch(() => {});
+          setUser(null);
+          throw new Error('Email və ya şifrə yanlışdır.');
+        }
+        return me;
+      }
+
+      if (clientEnv.isLocalSandbox) {
+        const res = await apiRequest<{ access_token: string; user: AuthSessionUser }>(
+          '/api/auth/admin-login',
           { method: 'POST', body: input, auth: false },
         );
         setSandboxToken(res.access_token);
@@ -245,6 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         acknowledgeLogout,
         refreshUser,
         login,
+        loginAdmin,
         register,
         logout,
       }}

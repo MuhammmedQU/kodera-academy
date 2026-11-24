@@ -43,7 +43,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
     if (justLoggedOut) {
       return <Navigate to="/" replace />;
     }
-    return <Navigate to="/login" state={{ from: fullPath }} replace />;
+    return <Navigate to="/admin/login" state={{ from: fullPath }} replace />;
   }
 
   if (!user.isAdmin) {

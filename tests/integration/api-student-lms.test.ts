@@ -8,7 +8,7 @@ describe('Phase 6 — Student Dashboard, Course Isolation, Progress & Quiz Gradi
   });
 
   it('shows student ONLY their assigned course (Python) and blocks unassigned course (SQL)', async () => {
-    const token = await loginAs('student@kodera.local', 'StudentPass123!');
+    const token = await loginAs('student@kodera.local');
 
     const listRes = await callApi({ url: '/api/student/courses', token });
     expect(listRes.status).toBe(200);
@@ -25,7 +25,7 @@ describe('Phase 6 — Student Dashboard, Course Isolation, Progress & Quiz Gradi
   });
 
   it('never leaks quiz answer keys (is_correct) or exercise solutions in lesson payload, and grades strictly server-side', async () => {
-    const token = await loginAs('student@kodera.local', 'StudentPass123!');
+    const token = await loginAs('student@kodera.local');
 
     const lessonRes = await callApi({
       url: '/api/student/courses/python-esaslari/lessons/ilk-python-kodu-print',
@@ -80,7 +80,7 @@ describe('Phase 6 — Student Dashboard, Course Isolation, Progress & Quiz Gradi
   });
 
   it('tracks lesson completion and blocks progress writes for unassigned courses', async () => {
-    const token = await loginAs('student@kodera.local', 'StudentPass123!');
+    const token = await loginAs('student@kodera.local');
 
     // Complete assigned Python lesson -> 200
     const completeRes = await callApi({

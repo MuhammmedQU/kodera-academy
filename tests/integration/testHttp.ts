@@ -1,5 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { LocalSandboxRepository } from '@server/dev/localSandboxRepository';
+import {
+  getEphemeralSandboxPassword,
+  LocalSandboxRepository,
+} from '@server/dev/localSandboxRepository';
 import { dispatchApiRequest } from '@server/dev/viteApiMiddleware';
 import { resetRepositoryForTests } from '@server/lib/getRepository';
 
@@ -72,7 +75,10 @@ export async function callApi(options: {
   return { status, headers: resHeaders, body: parsed };
 }
 
-export async function loginAs(email: string, password: string): Promise<string> {
+export async function loginAs(
+  email: string,
+  password = getEphemeralSandboxPassword(),
+): Promise<string> {
   const res = await callApi({
     method: 'POST',
     url: '/api/auth/login',
@@ -80,6 +86,21 @@ export async function loginAs(email: string, password: string): Promise<string> 
   });
   if (res.status !== 200) {
     throw new Error(`Login failed for ${email}: ${JSON.stringify(res.body)}`);
+  }
+  return (res.body as { data: { access_token: string } }).data.access_token;
+}
+
+export async function loginAdminAs(
+  email = 'koderaaz@gmail.com',
+  password = getEphemeralSandboxPassword(),
+): Promise<string> {
+  const res = await callApi({
+    method: 'POST',
+    url: '/api/auth/admin-login',
+    body: { email, password },
+  });
+  if (res.status !== 200) {
+    throw new Error(`Admin login failed for ${email}: ${JSON.stringify(res.body)}`);
   }
   return (res.body as { data: { access_token: string } }).data.access_token;
 }

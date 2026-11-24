@@ -35,7 +35,7 @@ export async function requireActiveStudent(
   repo: KoderaRepository,
 ): Promise<{ user: AuthSessionUser; token: string }> {
   const result = await requireAuthenticated(req, repo);
-  if (!result.user.isActiveStudent) {
+  if (result.user.isAdmin || !result.user.isActiveStudent) {
     throw new HttpError(
       403,
       'STUDENT_ACCESS_REQUIRED',

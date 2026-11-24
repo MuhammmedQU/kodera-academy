@@ -106,13 +106,15 @@ Aşağıdakı 5 addım xarici hesablarınızı (GitHub, Supabase, Vercel) tələ
    - **Site URL:** `https://<staging-preview-url>.vercel.app`
    - **Redirect URLs:**
      - `https://<staging-preview-url>.vercel.app/login`
+     - `https://<staging-preview-url>.vercel.app/admin/login`
      - `https://<staging-preview-url>.vercel.app/reset-password`
 2. **Authentication → Providers → Email:**
    - `Confirm email`: **ON**
    - `Minimum password length`: **8**
    - `Password requirements`: **Letters and digits**
-3. **Authentication → Users → Add User:** öz admin emailinizlə istifadəçi yaradın (`Auto Confirm User: ON`).
-4. SQL Editor-da [promote_first_admin.sql](../supabase/bootstrap/promote_first_admin.sql) skriptində `ADMIN_EMAIL_HERE` hissəsini öz emailinizlə əvəz edib icra edin.
+3. **Authentication → Users → Add User:** rəsmi admin e-poçtu (`koderaaz@gmail.com`) və yalnız sizin bildiyiniz güclü şifrə ilə istifadəçi yaradın (`Auto Confirm User: ON`).
+4. SQL Editor-da [promote_first_admin.sql](../supabase/bootstrap/promote_first_admin.sql) skriptini (artıq `koderaaz@gmail.com` üçün konfiqurasiya olunub və e-poçt təsdiqini yoxlayır) birbaşa icra edin.
+5. `https://<staging-preview-url>.vercel.app/admin/login` səhifəsinə keçərək `koderaaz@gmail.com` ilə daxil olun.
 
 ---
 

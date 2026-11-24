@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AdminDashboardStats } from '@shared/types/domain';
 import { SEED_IDS } from '@server/content/initialSeed';
-import { callApi, createTestSandbox, loginAs } from './testHttp';
+import { callApi, createTestSandbox, loginAdminAs, loginAs } from './testHttp';
 
 describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dynamic Public Modules', () => {
   beforeEach(() => {
@@ -9,7 +9,7 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
   });
 
   it('denies every admin endpoint to anonymous and student accounts (HTTP 401/403)', async () => {
-    const studentToken = await loginAs('student@kodera.local', 'StudentPass123!');
+    const studentToken = await loginAs('student@kodera.local');
     const endpoints = [
       { method: 'GET', url: '/api/admin/stats' },
       { method: 'GET', url: '/api/admin/applications' },
@@ -30,7 +30,7 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
   });
 
   it('starts with 0 fake statistics, separates approval from course assignment, and updates real stats dynamically', async () => {
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
 
     // 0. Before any real student registers, dashboard statistics MUST show 0 (demo fixtures never contaminate stats!)
     const initialStatsRes = await callApi({ url: '/api/admin/stats', token: adminToken });
@@ -196,7 +196,7 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
   });
 
   it('dynamically controls public module access from database settings (is_public toggle)', async () => {
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
     const mod2LessonUrl = '/api/public/courses/python-esaslari/lessons/istifadeciden-melumat-almaq-input';
 
     // Initially Module 2 is public -> anon gets 200
@@ -224,7 +224,7 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
   });
 
   it('allows admin to create a new non-Python course (C++) with modules, lessons, blocks, exercises, and quizzes', async () => {
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
 
     const courseRes = await callApi({
       method: 'POST',

@@ -9,12 +9,17 @@
 
 Kodera platforması nümayiş (demo) xarakterli saxta statistikalardan və nümunə əlaqə məlumatlarından tamamilə təmizlənərək **real proqramlaşdırma akademiyası** kimi işləyəcək vəziyyətə gətirildi:
 
-1. **Rəsmi Akademiya Məlumatları Tətbiq Edildi:**
+1. **Rəsmi Akademiya və Admin Hesabı Məlumatları Tətbiq Edildi:**
    - **Akademiya adı:** `Kodera Academy`
-   - **Rəsmi WhatsApp nömrəsi:** `994702045610` (`https://wa.me/994702045610?text=...`)
-   - **Rəsmi əlaqə e-poçtu:** `muhammed.ehmedov94@gmail.com` (`mailto:muhammed.ehmedov94@gmail.com`)
+   - **Rəsmi Admin Giriş E-poçtu (`admin_login_email`):** `koderaaz@gmail.com` (yalnız `/admin/login` autentifikasiyası üçün; ictimai səhifələrdə və `GET /api/public/settings` cavabında heç vaxt göstərilmir)
+   - **Rəsmi İctimai Tələbə Əlaqə E-poçtu (`contact_email`):** `muhammed.ehmedov94@gmail.com` (`mailto:muhammed.ehmedov94@gmail.com`)
    - **E-poçt göndərən adı (Sender Display Name):** `Kodera Academy`
+   - **Rəsmi WhatsApp nömrəsi:** `994702045610` (`https://wa.me/994702045610?text=...`)
    - **Fərdi domen (`website_domain`):** `NULL` (hələ alınmayıb — heç bir uydurma domen yazılmayıb; Staging-də Vercel Preview URL istifadə olunur, gələcək domen `/admin/settings` və `APP_URL` üzərindən tənzimlənir).
+2. **Tələbə (`/login`) və Administrator (`/admin/login`) Girişləri Tam Ayrıldı:**
+   - `/login` yalnız tələbələr üçündür (admin giriş seçimi göstərilmir; admin hesabları `/login` və `/dashboard`-dan rədd edilir).
+   - `/admin/login` ([AdminLoginPage.tsx](file:///c:/Users/LENOVO/Desktop/Py_Course/src/features/auth/AdminLoginPage.tsx)) yalnız administratorlar üçündür (`POST /api/auth/admin-login` və `POST /api/auth/admin-verify` + IP/email rate limiting); autentifikasiya olunmamış `/admin` müraciətləri `/admin/login`-ə yönləndirilir, tələbələr isə həm UI, həm API (`401`/`403`), həm də PostgreSQL RLS (`public.is_admin()`) səviyyəsində bloklanır.
+   - Bütün kod bazasından və sənədlərdən köhnə hardcoded sandbox parolları tam silindi (`LocalSandboxRepository` yalnız proses-daxili təsadüfi ephemeral runtime parolundan istifadə edir).
 2. **Saxta Admin Statistikaları Silindi və 12 Real Göstərici ilə Əvəzləndi:**
    - Əvvəlki `1 gözləyən müraciət, 2 aktiv tələbə, 2 aktiv təyinat, 1 dondurulmuş hesab` kimi nümunə rəqəmlər tam silindi.
    - Yeni PostgreSQL RPC funksiyası (`public.get_admin_dashboard_stats()` — Miqrasiya `20261123000008`) və server endpoint-i (`GET /api/admin/stats`) vasitəsilə bütün 12 göstərici birbaşa verilənlər bazasından hesablanır.

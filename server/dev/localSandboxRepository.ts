@@ -134,6 +134,22 @@ export const SANDBOX_USERS = {
   SUSPENDED_ID: '90000000-0000-4000-8000-000000000006',
 } as const;
 
+const EPHEMERAL_SANDBOX_SECRET =
+  process.env.KODERA_SANDBOX_EPHEMERAL_SECRET?.trim() ||
+  `Kdr_${crypto.randomBytes(12).toString('hex')}!9`;
+
+/**
+ * Returns the process-local ephemeral secret used only by automated test fixtures
+ * in local sandbox mode (`NODE_ENV !== 'production'`).
+ * Never hardcoded or persisted.
+ */
+export function getEphemeralSandboxPassword(): string {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Ephemeral sandbox password is strictly forbidden in production.');
+  }
+  return EPHEMERAL_SANDBOX_SECRET;
+}
+
 /**
  * Isolated test fixture account IDs (`@kodera.local`).
  * These accounts remain available for isolated local RBAC/auth tests (`loginSandbox`),
@@ -201,6 +217,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       academy_name: 'Kodera Academy',
       academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
       logo_storage_path: null,
+      admin_login_email: 'koderaaz@gmail.com',
       contact_email: 'muhammed.ehmedov94@gmail.com',
       email_sender_name: 'Kodera Academy',
       website_domain: null,
@@ -233,7 +250,8 @@ export class LocalSandboxRepository implements KoderaRepository {
     seed.exercises.forEach((e) => this.exercises.set(e.id, e));
     seed.quizzes.forEach((q) => this.quizzes.set(q.id, q));
 
-    // Sandbox test accounts (local dev & automated tests ONLY)
+    // Sandbox test accounts (local dev & automated tests ONLY; ephemeral runtime secret, never hardcoded)
+    const ephemeralSecret = getEphemeralSandboxPassword();
     const accounts: Array<{
       id: string;
       email: string;
@@ -247,8 +265,8 @@ export class LocalSandboxRepository implements KoderaRepository {
     }> = [
       {
         id: SANDBOX_USERS.ADMIN_ID,
-        email: 'admin@kodera.local',
-        password: 'AdminPass123!',
+        email: 'koderaaz@gmail.com',
+        password: ephemeralSecret,
         full_name: 'Kodera Administrator',
         status: 'active',
         roles: ['admin'],
@@ -256,7 +274,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       {
         id: SANDBOX_USERS.STUDENT_PY_ID,
         email: 'student@kodera.local',
-        password: 'StudentPass123!',
+        password: ephemeralSecret,
         full_name: 'Aysel Məmmədova',
         status: 'active',
         roles: ['student'],
@@ -266,7 +284,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       {
         id: SANDBOX_USERS.STUDENT_NONE_ID,
         email: 'approved-nocourse@kodera.local',
-        password: 'StudentPass123!',
+        password: ephemeralSecret,
         full_name: 'Rəşad Əliyev',
         status: 'active',
         roles: ['student'],
@@ -276,7 +294,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       {
         id: SANDBOX_USERS.PENDING_ID,
         email: 'pending@kodera.local',
-        password: 'StudentPass123!',
+        password: ephemeralSecret,
         full_name: 'Nigar Həsənova',
         status: 'pending',
         roles: ['student'],
@@ -286,7 +304,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       {
         id: SANDBOX_USERS.REJECTED_ID,
         email: 'rejected@kodera.local',
-        password: 'StudentPass123!',
+        password: ephemeralSecret,
         full_name: 'Elvin Quliyev',
         status: 'rejected',
         roles: ['student'],
@@ -297,7 +315,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       {
         id: SANDBOX_USERS.SUSPENDED_ID,
         email: 'suspended@kodera.local',
-        password: 'StudentPass123!',
+        password: ephemeralSecret,
         full_name: 'Tural Kərimov',
         status: 'suspended',
         roles: ['student'],
@@ -402,7 +420,7 @@ export class LocalSandboxRepository implements KoderaRepository {
     if (!profile) return null;
     const userRoles = Array.from(this.roles.get(userId) ?? []);
     const isAdmin = userRoles.includes('admin') && profile.account_status === 'active';
-    const isActiveStudent = userRoles.includes('student') && profile.account_status === 'active';
+    const isActiveStudent = !isAdmin && userRoles.includes('student') && profile.account_status === 'active';
     const apps = Array.from(this.applications.values())
       .filter((a) => a.user_id === userId)
       .sort((a, b) => b.submitted_at.localeCompare(a.submitted_at));
@@ -1691,6 +1709,7 @@ export class LocalSandboxRepository implements KoderaRepository {
       academy_name: input.academy_name,
       academy_tagline: input.academy_tagline,
       logo_storage_path: input.logo_storage_path ?? null,
+      admin_login_email: input.admin_login_email || this.settings.admin_login_email || 'koderaaz@gmail.com',
       contact_email: input.contact_email ?? null,
       email_sender_name: input.email_sender_name || 'Kodera Academy',
       website_domain: input.website_domain ?? null,

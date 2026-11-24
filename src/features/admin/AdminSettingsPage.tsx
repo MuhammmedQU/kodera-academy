@@ -62,6 +62,7 @@ export function AdminSettingsPage() {
     academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
     logo_storage_path: '',
     website_domain: '',
+    admin_login_email: 'koderaaz@gmail.com',
     contact_email: 'muhammed.ehmedov94@gmail.com',
     email_sender_name: 'Kodera Academy',
     whatsapp_phone: '994702045610',
@@ -83,6 +84,7 @@ export function AdminSettingsPage() {
           academy_tagline: data.academy_tagline,
           logo_storage_path: data.logo_storage_path ?? '',
           website_domain: data.website_domain ?? '',
+          admin_login_email: data.admin_login_email || 'koderaaz@gmail.com',
           contact_email: data.contact_email ?? 'muhammed.ehmedov94@gmail.com',
           email_sender_name: data.email_sender_name || 'Kodera Academy',
           whatsapp_phone: data.raw_whatsapp_phone ?? '',
@@ -118,6 +120,7 @@ export function AdminSettingsPage() {
           academy_tagline: form.academy_tagline,
           logo_storage_path: form.logo_storage_path.trim() || null,
           website_domain: form.website_domain.trim() || null,
+          admin_login_email: form.admin_login_email.trim().toLowerCase() || 'koderaaz@gmail.com',
           contact_email: form.contact_email.trim() || null,
           email_sender_name: form.email_sender_name.trim() || 'Kodera Academy',
           whatsapp_phone: form.whatsapp_phone.trim() || null,
@@ -344,11 +347,20 @@ export function AdminSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label="Rəsmi e-poçt ünvanı (mailto: və əlaqə bölmələri)"
+                label="Administrator giriş emaili (yalnız autentifikasiya)"
                 type="email"
                 required
+                hint="İctimai əlaqə bölmələrində göstərilmir."
+                value={form.admin_login_email}
+                onChange={(e) => setForm((p) => ({ ...p, admin_login_email: e.target.value }))}
+              />
+              <Input
+                label="İctimai tələbə əlaqə emaili (mailto: və footer)"
+                type="email"
+                required
+                hint="Saytın əlaqə bölmələrində göstərilən rəsmi ünvan."
                 value={form.contact_email}
                 onChange={(e) => setForm((p) => ({ ...p, contact_email: e.target.value }))}
               />

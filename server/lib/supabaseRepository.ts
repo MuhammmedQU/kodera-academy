@@ -192,11 +192,12 @@ export class SupabaseRepository implements KoderaRepository {
     const roles = ((rolesRes.data ?? []) as Array<{ role: AppRole }>).map((r) => r.role);
     const application = ((appsRes.data ?? [])[0] as Application | undefined) ?? null;
 
+    const isAdmin = roles.includes('admin') && profile.account_status === 'active';
     return {
       profile,
       roles,
-      isAdmin: roles.includes('admin') && profile.account_status === 'active',
-      isActiveStudent: roles.includes('student') && profile.account_status === 'active',
+      isAdmin,
+      isActiveStudent: !isAdmin && roles.includes('student') && profile.account_status === 'active',
       application,
     };
   }
@@ -1852,6 +1853,7 @@ export class SupabaseRepository implements KoderaRepository {
     assertNoDbError(error, 'Tənzimləmələr oxunmadı.');
     const { id: _omitId, ...row } = data as PublicPlatformSettings & {
       id: boolean;
+      admin_login_email?: string;
       email_sender_name?: string;
       website_domain?: string | null;
       updated_by: string | null;
@@ -1866,6 +1868,8 @@ export class SupabaseRepository implements KoderaRepository {
 
     return {
       ...row,
+      admin_login_email:
+        row.admin_login_email ?? process.env.ADMIN_LOGIN_EMAIL?.trim() ?? 'koderaaz@gmail.com',
       email_sender_name: row.email_sender_name ?? 'Kodera Academy',
       website_domain: row.website_domain ?? null,
       whatsapp_button_enabled: enabled,

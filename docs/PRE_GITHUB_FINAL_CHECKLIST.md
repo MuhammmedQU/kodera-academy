@@ -33,7 +33,7 @@ Real Google Chrome üzərində Playwright E2E və **72 viewport yoxlaması** (24
 ### 1.4 Gizli Açarların (Secrets) Qorunması və `.env` Şablonları
 - [x] **`.gitignore`:** `.env`, `.env.*`, `dist/`, `node_modules/`, `.vercel/`, `.supabase/`, `playwright-report/`, `test-results/` tam bloklanıb; yalnız `!.env.example` və `!.env.staging.example` şablonlarına icazə verilir.
 - [x] **`.env.example` və `.env.staging.example`:** Yalnız təhlükəsiz placeholder dəyərlər saxlayır (`https://YOUR-DEV-PROJECT.supabase.co`, `https://YOUR-KODERA-DEV-REF.supabase.co`).
-- [x] **Avtomatik Qoruma (`scripts/security-check.mjs`):** `src/`, `dist/`, `.env.example` və `.env.staging.example` daxilində `SUPABASE_SERVICE_ROLE_KEY`, `sb_secret_*`, JWT tokenləri (`eyJhbGciOi...`), real `.supabase.co` domenləri, `dangerouslySetInnerHTML`, `eval()`, `innerHTML` və test parollarını (`AdminPass123!`, `StudentPass123!`) avtomatik yoxlayır → **0 pozuntu**.
+- [x] **Avtomatik Qoruma (`scripts/security-check.mjs`):** `src/`, `server/`, `api/`, `tests/`, `supabase/`, `docs/`, `dist/`, `.env.example` və `.env.staging.example` daxilində `SUPABASE_SERVICE_ROLE_KEY`, `sb_secret_*`, JWT tokenləri (`eyJhbGciOi...`), real `.supabase.co` domenləri, `dangerouslySetInnerHTML`, `eval()`, `innerHTML` və hardcoded demo parollarını avtomatik yoxlayır → **0 pozuntu**.
 
 ### 1.5 SQL Miqrasiyaları, Seed Faylı və İlk Admin Skripti
 Bütün SQL faylları UTF-8 (BOM-suz), balanslaşdırılmış dırnaqlar/`$$` blokları və Supabase CLI 14-rəqəmli adlandırma standartı (`YYYYMMDDHHmmss_*.sql`) üzrə doğrulanıb:

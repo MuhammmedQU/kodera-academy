@@ -5,8 +5,10 @@
 -- Real Database-Backed Admin Dashboard Statistics RPC
 -- ============================================================================
 
--- 1. Extend platform_settings with email_sender_name and future website_domain
+-- 1. Extend platform_settings with admin_login_email, email_sender_name, and future website_domain
 ALTER TABLE public.platform_settings
+    ADD COLUMN IF NOT EXISTS admin_login_email text NOT NULL DEFAULT 'koderaaz@gmail.com'
+        CHECK (admin_login_email = lower(btrim(admin_login_email)) AND position('@' IN admin_login_email) > 1),
     ADD COLUMN IF NOT EXISTS email_sender_name text NOT NULL DEFAULT 'Kodera Academy'
         CHECK (char_length(btrim(email_sender_name)) BETWEEN 2 AND 100),
     ADD COLUMN IF NOT EXISTS website_domain text NULL
@@ -19,8 +21,11 @@ ALTER TABLE public.platform_settings
         );
 
 -- 2. Align column defaults and singleton row with official Kodera Academy contact details
+--    Note: admin_login_email ('koderaaz@gmail.com') is strictly separate from
+--    public student contact_email ('muhammed.ehmedov94@gmail.com').
 ALTER TABLE public.platform_settings
     ALTER COLUMN academy_name SET DEFAULT 'Kodera Academy',
+    ALTER COLUMN admin_login_email SET DEFAULT 'koderaaz@gmail.com',
     ALTER COLUMN contact_email SET DEFAULT 'muhammed.ehmedov94@gmail.com',
     ALTER COLUMN whatsapp_phone SET DEFAULT '994702045610',
     ALTER COLUMN whatsapp_button_enabled SET DEFAULT true,
@@ -30,6 +35,7 @@ ALTER TABLE public.platform_settings
 INSERT INTO public.platform_settings (
     id,
     academy_name,
+    admin_login_email,
     contact_email,
     email_sender_name,
     website_domain,
@@ -41,6 +47,7 @@ INSERT INTO public.platform_settings (
 VALUES (
     true,
     'Kodera Academy',
+    'koderaaz@gmail.com',
     'muhammed.ehmedov94@gmail.com',
     'Kodera Academy',
     NULL,
@@ -55,6 +62,7 @@ ON CONFLICT (id) DO UPDATE
            THEN 'Kodera Academy'
            ELSE public.platform_settings.academy_name
        END,
+       admin_login_email = COALESCE(NULLIF(lower(btrim(public.platform_settings.admin_login_email)), ''), 'koderaaz@gmail.com'),
        contact_email = CASE
            WHEN public.platform_settings.contact_email IS NULL
                 OR public.platform_settings.contact_email = 'info@kodera.academy'
@@ -75,6 +83,29 @@ ON CONFLICT (id) DO UPDATE
            ELSE public.platform_settings.whatsapp_button_enabled
        END,
        whatsapp_message_template = 'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.';
+
+-- 2b. Ensure admin accounts cannot evaluate as active students in PostgreSQL RLS
+CREATE OR REPLACE FUNCTION public.is_active_student()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+    SELECT NOT public.is_admin()
+       AND EXISTS (
+           SELECT 1
+             FROM public.profiles p
+             JOIN public.user_roles ur ON ur.user_id = p.id
+            WHERE p.id = auth.uid()
+              AND p.account_status = 'active'
+              AND ur.role = 'student'
+              AND ur.revoked_at IS NULL
+       );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_active_student() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_active_student() TO anon, authenticated, service_role;
 
 -- 3. Update get_public_platform_settings() to include email_sender_name and website_domain
 DROP FUNCTION IF EXISTS public.get_public_platform_settings();

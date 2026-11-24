@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { getRepository, resetRepositoryForTests } from '@server/lib/getRepository';
 import { getClientIp, parseApiRequest, readJsonBody } from '@server/lib/http';
 import { SEED_IDS } from '@server/content/initialSeed';
-import { callApi, createTestSandbox, loginAs } from './testHttp';
+import { callApi, createTestSandbox, loginAdminAs, loginAs } from './testHttp';
 
 describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Verification', () => {
   beforeEach(() => {
@@ -13,7 +13,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
   });
 
   it('safely handles SQL injection payloads in admin search endpoints without error or data leak', async () => {
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
     const sqli = encodeURIComponent("' OR '1'='1'; DROP TABLE profiles; --");
 
     const appsRes = await callApi({
@@ -43,7 +43,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     });
     expect(badReg.status).toBe(400);
 
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
     const badSettings = await callApi({
       method: 'PUT',
       url: '/api/admin/settings',
@@ -72,7 +72,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
   });
 
   it('blocks admin self-suspension, admin-on-admin suspension, and PENDING approval bypass', async () => {
-    const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
+    const adminToken = await loginAdminAs('koderaaz@gmail.com');
     const adminMe = await callApi({ url: '/api/auth/me', token: adminToken });
     const adminId = (adminMe.body as { data: { profile: { id: string } } }).data.profile.id;
 
@@ -86,7 +86,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     expect(selfSuspend.status).toBe(403);
 
     // Cannot bypass application approval by directly setting PENDING student to active
-    const pendingToken = await loginAs('pending@kodera.local', 'StudentPass123!');
+    const pendingToken = await loginAs('pending@kodera.local');
     const pendingMe = await callApi({ url: '/api/auth/me', token: pendingToken });
     const pendingId = (pendingMe.body as { data: { profile: { id: string } } }).data.profile.id;
 
@@ -109,7 +109,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
   });
 
   it('revokes sandbox session on POST /api/auth/logout and rejects non-UUID route params cleanly', async () => {
-    const studentToken = await loginAs('student@kodera.local', 'StudentPass123!');
+    const studentToken = await loginAs('student@kodera.local');
     const logoutRes = await callApi({
       method: 'POST',
       url: '/api/auth/logout',
@@ -121,7 +121,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     expect(afterLogout.status).toBe(401);
 
     // Non-UUID lesson ID is cleanly rejected at route matcher level (404, never reaches Postgres)
-    const freshToken = await loginAs('student@kodera.local', 'StudentPass123!');
+    const freshToken = await loginAs('student@kodera.local');
     const badUuid = await callApi({
       method: 'PUT',
       url: '/api/student/lessons/not-a-valid-uuid/progress',
@@ -225,6 +225,8 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     );
     expect(mig0008).toContain('994702045610');
     expect(mig0008).toContain('muhammed.ehmedov94@gmail.com');
+    expect(mig0008).toContain('koderaaz@gmail.com');
+    expect(mig0008).toContain('admin_login_email');
     expect(mig0008).toContain('Kodera Academy');
     expect(mig0008).toContain('get_admin_dashboard_stats');
 
