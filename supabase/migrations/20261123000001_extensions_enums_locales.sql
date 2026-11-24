@@ -1,6 +1,5 @@
 -- ============================================================================
--- KODERA LMS — Migration 0001: Extensions, ENUM Types, Locales, Utility Triggers
--- Phase 2 Draft (DO NOT execute on live Supabase before owner approval)
+-- Kodera Academy — Migration 0001: Extensions, ENUM Types, Locales, Utility Triggers
 -- ============================================================================
 
 -- 1. Required extensions

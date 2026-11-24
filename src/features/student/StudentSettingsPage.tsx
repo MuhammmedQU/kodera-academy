@@ -137,7 +137,7 @@ export function StudentSettingsPage() {
             variant="danger"
             onClick={async () => {
               await logout();
-              navigate('/');
+              navigate('/', { replace: true });
             }}
           >
             <LogOut className="h-4 w-4" />

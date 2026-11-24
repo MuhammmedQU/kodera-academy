@@ -1,7 +1,6 @@
 -- ============================================================================
--- KODERA LMS — Migration 0003: Courses, Modules, Lessons, 11 Content Blocks,
---                              Exercises & Quizzes
--- Phase 2 Draft (DO NOT execute on live Supabase before owner approval)
+-- Kodera Academy — Migration 0003: Courses, Modules, Lessons, 11 Content Blocks,
+--                                  Exercises & Quizzes
 -- ============================================================================
 
 -- 1. Courses (multi-course architecture: Python first, C++/SQL/JS/AI ready)

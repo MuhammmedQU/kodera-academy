@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "security:check": "node scripts/security-check.mjs",
+    "env:check": "node scripts/check-env.mjs",
     "staging:verify": "node scripts/verify-staging.mjs"
   },
   "dependencies": {

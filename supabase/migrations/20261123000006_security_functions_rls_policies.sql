@@ -1,7 +1,6 @@
 -- ============================================================================
--- KODERA LMS — Migration 0006: Security Functions, Column Hardening,
---                              Row Level Security (RLS) & Storage Policies
--- Phase 2 Draft (DO NOT execute on live Supabase before owner approval)
+-- Kodera Academy — Migration 0006: Security Functions, Column Hardening,
+--                                  Row Level Security (RLS) & Storage Policies
 -- ============================================================================
 
 -- ============================================================================
@@ -672,7 +671,7 @@ CREATE POLICY "audit_logs_admin_select"
 -- 22. rate_limit_events: NO policies for anon or authenticated (default-deny; service_role only)
 
 -- ============================================================================
--- SECTION 6: SUPABASE STORAGE BUCKET POLICIES (Draft Reference)
+-- SECTION 6: SUPABASE STORAGE BUCKET POLICIES
 -- Buckets:
 --   1. 'public-media'  (public = true): academy logo, course covers, public lesson images
 --   2. 'lesson-media'  (public = false): restricted lesson images (served via signed URLs)

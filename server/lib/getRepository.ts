@@ -8,15 +8,17 @@ function isPlaceholder(val: string): boolean {
   const lower = val.toLowerCase();
   return (
     lower.includes('your-dev-project') ||
+    lower.includes('your-kodera-dev') ||
     lower.includes('your-supabase-') ||
+    lower.includes('your-vercel-') ||
     lower.includes('placeholder') ||
     lower.includes('example')
   );
 }
 
 function resolveAppUrl(isProd: boolean): string {
-  const configured = process.env.APP_URL?.trim();
-  if (configured) {
+  const configured = (process.env.APP_URL || process.env.VITE_APP_URL || '').trim();
+  if (configured && !isPlaceholder(configured)) {
     if (isProd && (!configured.startsWith('https://') || configured.includes('localhost'))) {
       throw new HttpError(
         500,
@@ -47,17 +49,20 @@ export async function getRepository(): Promise<KoderaRepository> {
   if (cachedRepo) return cachedRepo;
 
   const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-  const supabaseUrl = process.env.SUPABASE_URL?.trim() || '';
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || '';
-  const anonKey = process.env.SUPABASE_ANON_KEY?.trim() || '';
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const anonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
   const hasSupabase =
     supabaseUrl.startsWith('https://') &&
     !isPlaceholder(supabaseUrl) &&
     serviceRoleKey.length > 20 &&
     !isPlaceholder(serviceRoleKey) &&
+    !serviceRoleKey.startsWith('sb_publishable_') &&
     anonKey.length > 20 &&
-    !isPlaceholder(anonKey);
+    !isPlaceholder(anonKey) &&
+    !anonKey.startsWith('sb_secret_') &&
+    serviceRoleKey !== anonKey;
 
   if (hasSupabase) {
     const appUrl = resolveAppUrl(isProd);

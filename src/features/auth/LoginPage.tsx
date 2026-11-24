@@ -17,7 +17,6 @@ import {
 import { useAuth } from '@/app/AuthContext';
 import { usePlatformSettings } from '@/app/SettingsContext';
 import { ApiError } from '@/lib/apiClient';
-import { clientEnv } from '@/lib/env';
 
 function parseAuthRedirectNotice(search: string, hash: string): {
   type: 'success' | 'error';
@@ -73,7 +72,6 @@ export function LoginPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -164,44 +162,6 @@ export function LoginPage() {
               Daxil ol
             </Button>
           </form>
-
-          {import.meta.env.DEV && clientEnv.isLocalSandbox && (
-            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-950">
-              <p className="font-semibold">Lokal Sandbox Test Hesabları (yalnız dev rejimi):</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValue('email', 'admin@kodera.local');
-                    setValue('password', 'AdminPass123!');
-                  }}
-                  className="rounded-lg bg-white px-2.5 py-1 font-medium text-[#18181B] shadow-2xs hover:bg-zinc-50"
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValue('email', 'student@kodera.local');
-                    setValue('password', 'StudentPass123!');
-                  }}
-                  className="rounded-lg bg-white px-2.5 py-1 font-medium text-[#18181B] shadow-2xs hover:bg-zinc-50"
-                >
-                  Tələbə (Python)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValue('email', 'pending@kodera.local');
-                    setValue('password', 'StudentPass123!');
-                  }}
-                  className="rounded-lg bg-white px-2.5 py-1 font-medium text-[#18181B] shadow-2xs hover:bg-zinc-50"
-                >
-                  Pending
-                </button>
-              </div>
-            </div>
-          )}
 
           {settings.registration_enabled && (
             <p className="mt-6 text-center text-sm text-zinc-600">

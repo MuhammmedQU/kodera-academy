@@ -1,6 +1,5 @@
 -- ============================================================================
--- KODERA LMS — Migration 0004: Enrollments, Lesson Progress & Student Attempts
--- Phase 2 Draft (DO NOT execute on live Supabase before owner approval)
+-- Kodera Academy — Migration 0004: Enrollments, Lesson Progress & Student Attempts
 -- ============================================================================
 
 -- 1. Course enrollments (strictly separated from application approval)

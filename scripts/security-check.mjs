@@ -41,6 +41,9 @@ for (const file of walkFiles(path.join(ROOT, 'src'), ['.ts', '.tsx', '.js', '.js
   if (/\.innerHTML\s*=/.test(content)) {
     errors.push(`[XSS-RISK] ${rel} assigns directly to innerHTML.`);
   }
+  if (content.includes('AdminPass123!') || content.includes('StudentPass123!')) {
+    errors.push(`[DEV-CREDENTIAL] ${rel} contains hardcoded sandbox test passwords in frontend src/.`);
+  }
 }
 
 // 2. Check built dist/ bundle if it exists for service role keys, hardcoded JWTs, or dev credentials
@@ -74,11 +77,32 @@ if (!fs.existsSync(gitignorePath)) {
   }
 }
 
-// 4. Verify no real .env files with populated JWT-like secrets exist in root
-for (const envName of ['.env', '.env.production']) {
+// 4. Verify no real .env files exist in root and templates contain ONLY placeholders
+for (const envName of ['.env', '.env.production', '.env.staging']) {
   const p = path.join(ROOT, envName);
   if (fs.existsSync(p)) {
     errors.push(`[ENV-CHECK] Unexpected ${envName} file found in project root.`);
+  }
+}
+
+for (const tplName of ['.env.example', '.env.staging.example']) {
+  const p = path.join(ROOT, tplName);
+  if (!fs.existsSync(p)) {
+    errors.push(`[ENV-TEMPLATE] Missing required template ${tplName}.`);
+    continue;
+  }
+  const tpl = fs.readFileSync(p, 'utf8');
+  if (/eyJhbGciOi[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/.test(tpl)) {
+    errors.push(`[ENV-TEMPLATE] ${tplName} contains a real JWT token instead of a placeholder.`);
+  }
+  if (/sb_(secret|publishable)_[A-Za-z0-9_-]{16,}/.test(tpl)) {
+    errors.push(`[ENV-TEMPLATE] ${tplName} contains a real Supabase key instead of a placeholder.`);
+  }
+  const supaUrls = tpl.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/gi) ?? [];
+  for (const u of supaUrls) {
+    if (!/YOUR-(DEV-PROJECT|KODERA-DEV-REF)/i.test(u)) {
+      errors.push(`[ENV-TEMPLATE] ${tplName} contains non-placeholder Supabase URL: ${u}`);
+    }
   }
 }
 

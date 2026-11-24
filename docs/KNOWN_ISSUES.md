@@ -20,8 +20,8 @@
 | ID | Məsələ | Prioritet | İzah / Tövsiyə |
 | :---: | :--- | :-: | :--- |
 | **LIM-01** | Pyodide brauzer məşqlərində görünən test halları (`visible_test_cases`) | Məhdudiyyət | Öyrənmə məşqləri üçün uyğundur və `solution_code` heç vaxt brauzerə göndərilmir. Gələcəkdə sertifikatlı imtahanlar əlavə olunarsa, ayrıca izolyasiya olunmuş server sandbox (məs. konteyner əsaslı) əlavə edilə bilər |
-| **LIM-02** | `supabase/config.toml`-da `secure_password_change = true` | Diqqət | Bu parametr Supabase Auth-da şifrə dəyişərkən yeni re-authentication nonce tələb edə bilər. `StudentSettingsPage` hazırda birbaşa `supabase.auth.updateUser({ password })` çağırır; Staging-də yoxlayın — əgər Supabase re-auth tələb edərsə, ya `reauthenticate()` axını əlavə edilməli, ya da layihə siyasətinə uyğun tənzimlənməlidir |
-| **LIM-03** | Rollup build zamanı `zod@4` `@__PURE__` şərh xəbərdarlığı | Aşağı (Zərərsiz) | `node_modules/zod/v4/core/{regexes,util}.js` fayllarındakı iki şərh barədə Vite/Rollup məlumat xəbərdarlığı verir; funksionallığa və ya bundle təhlükəsizliyinə təsiri yoxdur (`zod` upstream məsələsi) |
+| **LIM-02** | ~~`supabase/config.toml`-da `secure_password_change = true`~~ | **HƏLL EDİLDİ** | `supabase/config.toml` daxilində `secure_password_change = false` (Supabase Cloud default-u) təyin edildi ki, aktiv sessiyada `StudentSettingsPage` əlavə OTP şablonu olmadan şifrəni yeniləyə bilsin |
+| **LIM-03** | ~~Rollup build zamanı `zod@4` `@__PURE__` şərh xəbərdarlığı~~ | **HƏLL EDİLDİ** | `vite.config.ts` `rollupOptions.onwarn` ilə `node_modules` `INVALID_ANNOTATION` xəbərdarlığı təmizləndi → `npm run build` 0 xəbərdarlıqla işləyir |
 | **LIM-04** | `LocalSandboxRepository` yalnız lokal inkişaf və test üçündür | Məhdudiyyət | Production (`NODE_ENV=production` və ya `VERCEL=1`) mühitində kod səviyyəsində sərt şəkildə bloklanıb (`getRepository.ts` + inteqrasiya testi) |
 
 ---

@@ -39,7 +39,9 @@ password_requirements = "letters_digits"
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
-secure_password_change = true
+# Matches Supabase Cloud default so authenticated sessions can update password via
+# `supabase.auth.updateUser({ password })` without requiring a separate OTP nonce template.
+secure_password_change = false
 
 [storage]
 enabled = true

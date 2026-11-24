@@ -1,6 +1,5 @@
 -- ============================================================================
--- KODERA LMS — Migration 0002: Identity, Roles, Applications & Internal Notes
--- Phase 2 Draft (DO NOT execute on live Supabase before owner approval)
+-- Kodera Academy — Migration 0002: Identity, Roles, Applications & Internal Notes
 -- ============================================================================
 
 -- 1. User profiles (1:1 with auth.users; role is intentionally NOT stored here)

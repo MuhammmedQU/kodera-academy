@@ -17,18 +17,33 @@ function readEnv(key: string): string {
   return typeof val === 'string' ? val.trim() : '';
 }
 
+function isPlaceholder(val: string): boolean {
+  const lower = val.toLowerCase();
+  return (
+    lower.includes('your-dev-project') ||
+    lower.includes('your-kodera-dev') ||
+    lower.includes('your-supabase-') ||
+    lower.includes('your-vercel-') ||
+    lower.includes('placeholder')
+  );
+}
+
 const supabaseUrl = readEnv('VITE_SUPABASE_URL');
 const supabaseAnonKey = readEnv('VITE_SUPABASE_ANON_KEY');
+const rawAppUrl = readEnv('VITE_APP_URL');
 const appUrl =
-  readEnv('VITE_APP_URL') || (typeof window !== 'undefined' ? window.location.origin : '');
+  (rawAppUrl && !isPlaceholder(rawAppUrl) ? rawAppUrl : '') ||
+  (typeof window !== 'undefined' ? window.location.origin : '');
 
 const hasRealSupabaseUrl =
   supabaseUrl.length > 0 &&
-  !supabaseUrl.includes('YOUR-DEV-PROJECT') &&
-  supabaseUrl.startsWith('https://');
+  supabaseUrl.startsWith('https://') &&
+  !isPlaceholder(supabaseUrl);
 
 const hasRealAnonKey =
-  supabaseAnonKey.length > 0 && !supabaseAnonKey.includes('your-supabase-publishable');
+  supabaseAnonKey.length > 20 &&
+  !isPlaceholder(supabaseAnonKey) &&
+  !supabaseAnonKey.startsWith('sb_secret_');
 
 /**
  * Local sandbox mode is strictly restricted to non-production builds (`!import.meta.env.PROD`).

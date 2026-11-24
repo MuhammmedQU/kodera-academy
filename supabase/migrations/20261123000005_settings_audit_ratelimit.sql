@@ -1,7 +1,6 @@
 -- ============================================================================
--- KODERA LMS — Migration 0005: Platform Settings, Immutable Audit Logs &
---                              Serverless PostgreSQL Rate Limiting
--- Phase 2 Draft (DO NOT execute on live Supabase before owner approval)
+-- Kodera Academy — Migration 0005: Platform Settings, Immutable Audit Logs &
+--                                  Serverless PostgreSQL Rate Limiting
 -- ============================================================================
 
 -- 1. Platform & WhatsApp settings (strict singleton table; admin-only direct access)

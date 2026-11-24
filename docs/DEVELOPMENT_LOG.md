@@ -57,3 +57,10 @@
 - **Frontend, UX, A11y & Python Runner:** `tailwind-merge`, `<ButtonLink>` (54 iç-içə `<Link><Button>` silindi), Admin CMS `UNIQUE(sort_order)` 409 düzəlişi + tam Edit/Confirm modalları, `DashboardLayout` çıxış redirect yarışı (`justLoggedOut`) düzəlişi, `dist/`-dən dev parolların çıxarılması, Python harness `AssertionError` ayrılması və `import js` bloklaması.
 - **Yoxlama:** `typecheck` (0), `lint` (0), `vitest` (38/38), `playwright` Chrome E2E (4/4, 72 viewport = 0 overflow / 0 `a button` / 0 console error), `build`, `security:check` (0 pozuntu), `npm audit` (0 vulnerability).
 - **Yekun hesabatlar:** `docs/FINAL_AUDIT_REPORT.md`, `docs/SECURITY_AUDIT_REPORT.md`, `docs/PRODUCTION_READINESS.md`, `docs/KNOWN_ISSUES.md` — Təsnifat: **`2. READY FOR STAGING TESTING`**.
+
+## 2026-11-24 — GitHub və İlk Xarici Quraşdırma Öncəsi Yekun Lokal Hazırlıq
+- `LoginPage.tsx`-dən müvəqqəti dev test hesabları bloku silindi (`src/` daxilində 0 test parolu); `vite.config.ts`-də `node_modules` `INVALID_ANNOTATION` xəbərdarlığı təmizləndi (`npm run build` 0 xəbərdarlıq); `000001`–`000006` miqrasiya başlıqlarından köhnə `Phase 2 Draft` qeydləri çıxarıldı.
+- Bütün 7 SQL miqrasiyası Supabase CLI 14-rəqəmli formatına (`20261123000001`–`000007`) keçirildi; `000007`-də `prevent_audit_log_truncate()` ayrıldı; `supabase/config.toml`-da `secure_password_change = false` uyğunlaşdırıldı.
+- `.env.staging.example`, `supabase/bootstrap/promote_first_admin.sql`, `scripts/check-env.mjs` (`npm run env:check`), `scripts/verify-staging.mjs` (`npm run staging:verify`), `docs/STAGING_DEPLOYMENT_CHECKLIST.md` və `docs/PRE_GITHUB_FINAL_CHECKLIST.md` yaradıldı.
+- `scripts/security-check.mjs` həm `src/`, həm `dist/`, həm də `.env.example` / `.env.staging.example` şablonlarını yoxlayacaq şəkildə gücləndirildi.
+- `env:check`, `typecheck`, `lint`, `vitest` (38/38), `build` (0 xəbərdarlıq), `security:check` (0 pozuntu), `npm audit` (0 boşluq) və `playwright` Chrome E2E (4/4, 72 viewport) yenidən 100% uğurla keçdi.
