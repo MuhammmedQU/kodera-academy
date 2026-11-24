@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -297,24 +298,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: Boolean(user),
-        justLoggedOut,
-        acknowledgeLogout,
-        refreshUser,
-        login,
-        loginAdmin,
-        register,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const contextValue = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: Boolean(user),
+      justLoggedOut,
+      acknowledgeLogout,
+      refreshUser,
+      login,
+      loginAdmin,
+      register,
+      logout,
+    }),
+    [
+      user,
+      isLoading,
+      justLoggedOut,
+      acknowledgeLogout,
+      refreshUser,
+      login,
+      loginAdmin,
+      register,
+      logout,
+    ],
   );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

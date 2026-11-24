@@ -48,13 +48,19 @@ const hasRealAnonKey =
 /**
  * Local sandbox mode is strictly restricted to non-production builds (`!import.meta.env.PROD`).
  * In production builds, it is ALWAYS `false`.
+ * In local development, if Supabase is not configured yet and `VITE_LOCAL_SANDBOX` is not `'false'`,
+ * it automatically enables local sandbox mode so `npm run dev` works out of the box.
  */
-const isLocalSandbox = !import.meta.env.PROD && readEnv('VITE_LOCAL_SANDBOX') === 'true';
+const explicitSandbox = !import.meta.env.PROD && readEnv('VITE_LOCAL_SANDBOX') === 'true';
+const isSupabaseConfigured = !explicitSandbox && hasRealSupabaseUrl && hasRealAnonKey;
+const isLocalSandbox =
+  !import.meta.env.PROD &&
+  (explicitSandbox || (!isSupabaseConfigured && readEnv('VITE_LOCAL_SANDBOX') !== 'false'));
 
 export const clientEnv: ClientEnv = {
   supabaseUrl,
   supabaseAnonKey,
   appUrl,
-  isSupabaseConfigured: hasRealSupabaseUrl && hasRealAnonKey,
+  isSupabaseConfigured,
   isLocalSandbox,
 };

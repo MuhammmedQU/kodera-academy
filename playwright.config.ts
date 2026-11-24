@@ -6,6 +6,8 @@ const ephemeralSandboxSecret =
   `Kdr_${crypto.randomBytes(12).toString('hex')}!9`;
 process.env.KODERA_SANDBOX_EPHEMERAL_SECRET = ephemeralSandboxSecret;
 
+const liveBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -14,7 +16,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: liveBaseUrl || 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -27,10 +29,12 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'node scripts/dev-sandbox.mjs --port 4173 --host 127.0.0.1',
-    url: 'http://127.0.0.1:4173/api/health',
-    reuseExistingServer: false,
-    timeout: 60_000,
-  },
+  webServer: liveBaseUrl
+    ? undefined
+    : {
+        command: 'node scripts/dev-sandbox.mjs --port 4173 --host 127.0.0.1',
+        url: 'http://127.0.0.1:4173/api/health',
+        reuseExistingServer: false,
+        timeout: 60_000,
+      },
 });

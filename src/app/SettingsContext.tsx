@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { PublicPlatformSettings } from '@shared/types/domain';
 import { apiRequest } from '@/lib/apiClient';
 
@@ -41,7 +49,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         auth: false,
       });
       if (data && data.academy_name) {
-        setSettings(data);
+        setSettings((prev) =>
+          JSON.stringify(prev) === JSON.stringify(data) ? prev : data,
+        );
       }
     } catch {
       // Fall back safely to neutral default labels if API is temporarily unavailable
@@ -54,8 +64,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     void refreshSettings();
   }, [refreshSettings]);
 
+  const contextValue = useMemo(
+    () => ({ settings, isLoading, refreshSettings }),
+    [settings, isLoading, refreshSettings],
+  );
+
   return (
-    <SettingsContext.Provider value={{ settings, isLoading, refreshSettings }}>
+    <SettingsContext.Provider value={contextValue}>
       {children}
     </SettingsContext.Provider>
   );

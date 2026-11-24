@@ -21,6 +21,8 @@ import { useAuth } from '@/app/AuthContext';
 import { usePlatformSettings } from '@/app/SettingsContext';
 import { apiRequest, ApiError } from '@/lib/apiClient';
 
+const REGISTER_FORM_RESOLVER = zodResolver(registerSchema);
+
 export function RegisterPage() {
   const { user, isLoading, register: registerAccount } = useAuth();
   const { settings } = usePlatformSettings();
@@ -47,7 +49,7 @@ export function RegisterPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<z.input<typeof registerSchema>, unknown, RegisterInput>({
-    resolver: zodResolver(registerSchema),
+    resolver: REGISTER_FORM_RESOLVER,
     defaultValues: {
       full_name: '',
       email: '',

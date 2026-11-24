@@ -103,13 +103,14 @@ await check('GET / returns HSTS, X-Frame-Options, nosniff, and pinned Pyodide v0
 });
 
 // 3. Public settings via Vercel ?__route= rewrite
-await check('GET /api/public/settings returns academy settings via Vercel rewrite', async () => {
+await check('GET /api/public/settings returns official academy settings and hides admin_login_email', async () => {
   const res = await fetch(`${rawStagingUrl}/api/public/settings`);
   assert(res.status === 200, `Expected 200, got ${res.status}`);
   const json = await res.json();
   const body = json?.data ?? json;
   assert(typeof body.academy_name === 'string' && body.academy_name.length >= 2, 'Missing academy_name');
-  return `academy_name="${body.academy_name}", registration_enabled=${body.registration_enabled}`;
+  assert(!('admin_login_email' in body), 'SECURITY LEAK: admin_login_email must never appear in public settings');
+  return `academy_name="${body.academy_name}", contact_email="${body.contact_email}", registration_enabled=${body.registration_enabled}`;
 });
 
 // 4. Public courses & seed presence
@@ -143,16 +144,20 @@ await check('Restricted Python Module 3 lesson returns 403 for anonymous visitor
 });
 
 // 6. Auth & Admin endpoints reject unauthenticated calls with 401 + no-store
-await check('Unauthenticated /api/admin/students and /api/student/overview return 401 + no-store', async () => {
-  const [adm, stu] = await Promise.all([
+await check('Unauthenticated /api/admin/students, /api/admin/stats, /api/auth/admin-verify and /api/student/overview return 401 + no-store', async () => {
+  const [adm, stats, verify, stu] = await Promise.all([
     fetch(`${rawStagingUrl}/api/admin/students`),
+    fetch(`${rawStagingUrl}/api/admin/stats`),
+    fetch(`${rawStagingUrl}/api/auth/admin-verify`, { method: 'POST' }),
     fetch(`${rawStagingUrl}/api/student/overview`),
   ]);
   assert(adm.status === 401, `/api/admin/students expected 401, got ${adm.status}`);
+  assert(stats.status === 401, `/api/admin/stats expected 401, got ${stats.status}`);
+  assert(verify.status === 401, `/api/auth/admin-verify expected 401, got ${verify.status}`);
   assert(stu.status === 401, `/api/student/overview expected 401, got ${stu.status}`);
   assert((adm.headers.get('cache-control') ?? '').includes('no-store'), 'Admin response missing no-store');
   assert((stu.headers.get('cache-control') ?? '').includes('no-store'), 'Student response missing no-store');
-  return 'Both 401 + no-store';
+  return 'All 401 + no-store';
 });
 
 // 7. Malformed JSON handling returns 400 (never 500)
@@ -217,8 +222,8 @@ if (rawSupabaseUrl && anonKey) {
     return `options=${optRes.status}, questions=${qRes.status}`;
   });
 
-  await check('Anon RPC calls to check_and_record_rate_limit & review_application_atomic are denied', async () => {
-    const [rlRes, revRes] = await Promise.all([
+  await check('Anon RPC calls to check_and_record_rate_limit, review_application_atomic & get_admin_dashboard_stats are denied', async () => {
+    const [rlRes, revRes, statsRes] = await Promise.all([
       fetch(`${rawSupabaseUrl}/rest/v1/rpc/check_and_record_rate_limit`, {
         method: 'POST',
         headers: sbHeaders,
@@ -238,10 +243,16 @@ if (rawSupabaseUrl && anonKey) {
           p_reviewed_by: '00000000-0000-4000-8000-000000000001',
         }),
       }),
+      fetch(`${rawSupabaseUrl}/rest/v1/rpc/get_admin_dashboard_stats`, {
+        method: 'POST',
+        headers: sbHeaders,
+        body: '{}',
+      }),
     ]);
     assert(rlRes.status === 401 || rlRes.status === 403, `check_and_record_rate_limit expected 401/403, got ${rlRes.status}`);
     assert(revRes.status === 401 || revRes.status === 403, `review_application_atomic expected 401/403, got ${revRes.status}`);
-    return `rate_limit=${rlRes.status}, review_app=${revRes.status}`;
+    assert(statsRes.status === 401 || statsRes.status === 403, `get_admin_dashboard_stats expected 401/403, got ${statsRes.status}`);
+    return `rate_limit=${rlRes.status}, review_app=${revRes.status}, admin_stats=${statsRes.status}`;
   });
 
   await check('Anon safe public RPCs (get_public_platform_settings & get_course_curriculum_outline) succeed with locked slugs masked', async () => {

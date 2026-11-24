@@ -64,6 +64,13 @@ export async function getRepository(): Promise<KoderaRepository> {
     !anonKey.startsWith('sb_secret_') &&
     serviceRoleKey !== anonKey;
 
+  const explicitSandbox = !isProd && process.env.KODERA_LOCAL_SANDBOX === 'true';
+  if (explicitSandbox) {
+    const { LocalSandboxRepository } = await import('../dev/localSandboxRepository.js');
+    cachedRepo = new LocalSandboxRepository();
+    return cachedRepo;
+  }
+
   if (hasSupabase) {
     const appUrl = resolveAppUrl(isProd);
     cachedRepo = new SupabaseRepository({
@@ -76,8 +83,9 @@ export async function getRepository(): Promise<KoderaRepository> {
   }
 
   // SECURITY: Local sandbox is STRICTLY forbidden in production builds & Vercel deployments.
-  // Loaded dynamically so dev credentials & seed content are never statically imported in prod.
-  if (!isProd && process.env.KODERA_LOCAL_SANDBOX === 'true') {
+  // In local development (!isProd), if Supabase credentials are not configured yet and sandbox
+  // is not explicitly disabled, fall back to LocalSandboxRepository so `npm run dev` works cleanly.
+  if (!isProd && process.env.KODERA_LOCAL_SANDBOX !== 'false') {
     const { LocalSandboxRepository } = await import('../dev/localSandboxRepository.js');
     cachedRepo = new LocalSandboxRepository();
     return cachedRepo;

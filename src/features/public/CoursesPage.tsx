@@ -26,7 +26,7 @@ export function CoursesPage() {
   useEffect(() => {
     const controller = new AbortController();
     apiRequest<Course[]>('/api/public/courses', { auth: false, signal: controller.signal })
-      .then(setCourses)
+      .then((data) => setCourses(Array.isArray(data) ? data : []))
       .catch((err) => {
         if (controller.signal.aborted) return;
         setError(err instanceof ApiError ? err.message : 'Kurslar yüklənmədi.');
