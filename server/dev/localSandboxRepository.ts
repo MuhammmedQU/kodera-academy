@@ -134,6 +134,26 @@ export const SANDBOX_USERS = {
   SUSPENDED_ID: '90000000-0000-4000-8000-000000000006',
 } as const;
 
+/**
+ * Isolated test fixture account IDs (`@kodera.local`).
+ * These accounts remain available for isolated local RBAC/auth tests (`loginSandbox`),
+ * but are STRICTLY excluded from academy dashboard statistics, student directories,
+ * application lists, and enrollment reports so demo data never contaminates real academy views.
+ */
+export const DEMO_FIXTURE_USER_IDS = new Set<string>([
+  SANDBOX_USERS.ADMIN_ID,
+  SANDBOX_USERS.STUDENT_PY_ID,
+  SANDBOX_USERS.STUDENT_NONE_ID,
+  SANDBOX_USERS.PENDING_ID,
+  SANDBOX_USERS.REJECTED_ID,
+  SANDBOX_USERS.SUSPENDED_ID,
+]);
+
+export const DEMO_FIXTURE_ENROLLMENT_IDS = new Set<string>([
+  '70000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000002',
+]);
+
 interface StoredAuthUser {
   id: string;
   email: string;
@@ -178,20 +198,24 @@ export class LocalSandboxRepository implements KoderaRepository {
 
     const now = '2026-11-23T12:00:00.000Z';
     this.settings = {
-      academy_name: 'Kodera',
+      academy_name: 'Kodera Academy',
       academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
       logo_storage_path: null,
-      contact_email: 'info@kodera.academy',
+      contact_email: 'muhammed.ehmedov94@gmail.com',
+      email_sender_name: 'Kodera Academy',
+      website_domain: null,
       whatsapp_button_enabled: true,
-      whatsapp_phone: '994501234567',
+      whatsapp_phone: '994702045610',
       raw_whatsapp_button_enabled: true,
-      raw_whatsapp_phone: '994501234567',
+      raw_whatsapp_phone: '994702045610',
       whatsapp_button_label: 'WhatsApp ilə administratora yaz',
       whatsapp_message_template:
-        'Salam! {{academy_name}} akademiyasında qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
+        'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
       alternative_contact_text: 'Bizimlə əlaqə saxlamaq üçün rəsmi email ünvanımıza yaza bilərsiniz.',
       registration_enabled: true,
       default_public_modules_count: 2,
+      email_provider_configured: false,
+      email_provider_mode: 'local_sandbox_unconfigured',
       updated_by: SANDBOX_USERS.ADMIN_ID,
       updated_at: now,
     };
@@ -570,6 +594,8 @@ export class LocalSandboxRepository implements KoderaRepository {
       academy_tagline: this.settings.academy_tagline,
       logo_storage_path: this.settings.logo_storage_path,
       contact_email: this.settings.contact_email,
+      email_sender_name: this.settings.email_sender_name,
+      website_domain: this.settings.website_domain,
       whatsapp_button_enabled: enabled,
       whatsapp_phone: enabled ? this.settings.raw_whatsapp_phone : null,
       whatsapp_button_label: this.settings.whatsapp_button_label,
@@ -1024,21 +1050,50 @@ export class LocalSandboxRepository implements KoderaRepository {
   }
 
   // --- Admin ---
+  private isDemoFixtureUser(userId: string): boolean {
+    return DEMO_FIXTURE_USER_IDS.has(userId);
+  }
+
   async getAdminStats(): Promise<AdminDashboardStats> {
-    const apps = Array.from(this.applications.values());
-    const profiles = Array.from(this.profiles.values());
+    // Strictly exclude isolated @kodera.local test fixture accounts from real academy statistics
+    const apps = Array.from(this.applications.values()).filter(
+      (a) => !this.isDemoFixtureUser(a.user_id),
+    );
+    const profiles = Array.from(this.profiles.values()).filter(
+      (p) => !this.isDemoFixtureUser(p.id),
+    );
     const courses = Array.from(this.courses.values());
-    const studentProfiles = profiles.filter((p) => this.roles.get(p.id)?.has('student'));
+    const modules = Array.from(this.modules.values()).filter((m) => m.status !== 'archived');
+    const lessons = Array.from(this.lessons.values()).filter((l) => l.status !== 'archived');
+    const studentProfiles = profiles.filter(
+      (p) => this.roles.get(p.id)?.has('student') && !this.roles.get(p.id)?.has('admin'),
+    );
+    const suspendedCount = studentProfiles.filter((p) => p.account_status === 'suspended').length;
+    const realEnrollments = Array.from(this.enrollments.values()).filter(
+      (e) =>
+        !DEMO_FIXTURE_ENROLLMENT_IDS.has(e.id) &&
+        !this.isDemoFixtureUser(e.student_id) &&
+        e.status === 'active',
+    );
+    const completedLessons = Array.from(this.lessonProgress.values()).filter(
+      (lp) => !this.isDemoFixtureUser(lp.student_id) && lp.status === 'completed',
+    ).length;
 
     return {
+      total_registered_users: studentProfiles.filter((p) => p.account_status !== 'archived').length,
       pending_applications: apps.filter((a) => a.status === 'pending').length,
+      approved_applications: apps.filter((a) => a.status === 'approved').length,
+      rejected_applications: apps.filter((a) => a.status === 'rejected').length,
       active_students: studentProfiles.filter((p) => p.account_status === 'active').length,
-      suspended_students: studentProfiles.filter((p) => p.account_status === 'suspended').length,
+      suspended_accounts: suspendedCount,
+      suspended_students: suspendedCount,
+      active_enrollments: realEnrollments.length,
       published_courses: courses.filter((c) => c.is_published).length,
-      total_courses: courses.length,
-      total_lessons: this.lessons.size,
-      active_enrollments: Array.from(this.enrollments.values()).filter((e) => e.status === 'active')
-        .length,
+      total_courses: courses.filter((c) => c.status !== 'archived').length,
+      total_modules: modules.length,
+      published_lessons: lessons.filter((l) => l.is_published).length,
+      total_lessons: lessons.length,
+      completed_lessons: completedLessons,
       recent_audit_logs: this.auditLogs.slice(0, 10),
     };
   }
@@ -1046,6 +1101,7 @@ export class LocalSandboxRepository implements KoderaRepository {
   async listApplications(filter?: { status?: string; search?: string }): Promise<AdminApplicationView[]> {
     const q = filter?.search?.trim().toLowerCase();
     return Array.from(this.applications.values())
+      .filter((a) => !this.isDemoFixtureUser(a.user_id))
       .filter((a) => (!filter?.status || filter.status === 'all' ? true : a.status === filter.status))
       .map((a) => ({
         application: a,
@@ -1146,6 +1202,7 @@ export class LocalSandboxRepository implements KoderaRepository {
   async listStudents(filter?: { status?: string; search?: string }): Promise<AdminStudentView[]> {
     const q = filter?.search?.trim().toLowerCase();
     return Array.from(this.profiles.values())
+      .filter((p) => !this.isDemoFixtureUser(p.id))
       .filter((p) => this.roles.get(p.id)?.has('student'))
       .filter((p) =>
         !filter?.status || filter.status === 'all' ? true : p.account_status === filter.status,
@@ -1221,6 +1278,7 @@ export class LocalSandboxRepository implements KoderaRepository {
 
   async listEnrollments(filter?: { studentId?: string; courseId?: string }): Promise<Enrollment[]> {
     return Array.from(this.enrollments.values())
+      .filter((e) => !DEMO_FIXTURE_ENROLLMENT_IDS.has(e.id) && !this.isDemoFixtureUser(e.student_id))
       .filter((e) => (!filter?.studentId ? true : e.student_id === filter.studentId))
       .filter((e) => (!filter?.courseId ? true : e.course_id === filter.courseId))
       .map((e) => {
@@ -1634,6 +1692,8 @@ export class LocalSandboxRepository implements KoderaRepository {
       academy_tagline: input.academy_tagline,
       logo_storage_path: input.logo_storage_path ?? null,
       contact_email: input.contact_email ?? null,
+      email_sender_name: input.email_sender_name || 'Kodera Academy',
+      website_domain: input.website_domain ?? null,
       whatsapp_button_enabled: enabled,
       whatsapp_phone: enabled ? input.whatsapp_phone ?? null : null,
       raw_whatsapp_button_enabled: input.whatsapp_button_enabled,
@@ -1643,6 +1703,8 @@ export class LocalSandboxRepository implements KoderaRepository {
       alternative_contact_text: input.alternative_contact_text ?? null,
       registration_enabled: input.registration_enabled,
       default_public_modules_count: input.default_public_modules_count,
+      email_provider_configured: false,
+      email_provider_mode: 'local_sandbox_unconfigured',
       updated_by: audit.actorId,
       updated_at: new Date().toISOString(),
     };

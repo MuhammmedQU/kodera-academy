@@ -3,15 +3,17 @@ import type { PublicPlatformSettings } from '@shared/types/domain';
 import { apiRequest } from '@/lib/apiClient';
 
 const DEFAULT_SETTINGS: PublicPlatformSettings = {
-  academy_name: 'Kodera',
+  academy_name: 'Kodera Academy',
   academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
   logo_storage_path: null,
-  contact_email: 'info@kodera.academy',
-  whatsapp_button_enabled: false,
-  whatsapp_phone: null,
+  contact_email: 'muhammed.ehmedov94@gmail.com',
+  email_sender_name: 'Kodera Academy',
+  website_domain: null,
+  whatsapp_button_enabled: true,
+  whatsapp_phone: '994702045610',
   whatsapp_button_label: 'WhatsApp ilə administratora yaz',
   whatsapp_message_template:
-    'Salam! {{academy_name}} akademiyasında qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
+    'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
   alternative_contact_text: 'Bizimlə əlaqə saxlamaq üçün rəsmi email ünvanımıza yaza bilərsiniz.',
   registration_enabled: true,
   default_public_modules_count: 2,

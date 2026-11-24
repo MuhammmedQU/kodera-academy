@@ -258,7 +258,12 @@ export function ApplicationStatusPage() {
                   {settings.alternative_contact_text ||
                     'Müraciətiniz növbə ilə yoxlanılır. Suallarınız üçün rəsmi emailimizə yaza bilərsiniz.'}
                   {settings.contact_email && (
-                    <span className="mt-1 block font-semibold">{settings.contact_email}</span>
+                    <a
+                      href={`mailto:${settings.contact_email}`}
+                      className="mt-1 block font-semibold text-[#4338CA] hover:underline"
+                    >
+                      {settings.contact_email}
+                    </a>
                   )}
                 </Alert>
               )}
@@ -291,7 +296,13 @@ export function ApplicationStatusPage() {
                 )}
                 {settings.contact_email && (
                   <p className="mt-2 text-xs">
-                    Əlavə sualınız varsa: <strong>{settings.contact_email}</strong>
+                    Əlavə sualınız varsa:{' '}
+                    <a
+                      href={`mailto:${settings.contact_email}`}
+                      className="font-semibold underline"
+                    >
+                      {settings.contact_email}
+                    </a>
                   </p>
                 )}
               </Alert>

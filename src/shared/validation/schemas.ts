@@ -419,6 +419,17 @@ export const platformSettingsUpdateSchema = z
       .nullable()
       .optional()
       .or(z.literal('').transform(() => null)),
+    email_sender_name: z.string().trim().min(2).max(100).optional().default('Kodera Academy'),
+    website_domain: z
+      .string()
+      .trim()
+      .max(255)
+      .nullable()
+      .optional()
+      .or(z.literal('').transform(() => null))
+      .refine((v) => !v || /^https:\/\/[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(v), {
+        message: 'Fərdi domen https:// ilə başlamalıdır (məs., https://example.az).',
+      }),
     whatsapp_phone: z
       .string()
       .trim()
@@ -430,7 +441,7 @@ export const platformSettingsUpdateSchema = z
         return digits.length > 0 ? digits : null;
       })
       .refine((v) => v === null || whatsappDigitsRegex.test(v), {
-        message: 'WhatsApp nömrəsi yalnız beynəlxalq rəqəmlərlə olmalıdır (məs., 994501234567).',
+        message: 'WhatsApp nömrəsi yalnız beynəlxalq rəqəmlərlə olmalıdır (məs., 994702045610).',
       }),
     whatsapp_button_enabled: z.boolean(),
     whatsapp_button_label: z.string().trim().min(2).max(100),

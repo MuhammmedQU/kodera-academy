@@ -22,7 +22,7 @@
 │   └── shared/                # Frontend + Backend ortaq TypeScript tipləri və Zod sxemləri
 ├── supabase/
 │   ├── config.toml            # kodera-dev Supabase CLI konfiqurasiyası
-│   ├── migrations/            # 7 ardıcıl PostgreSQL sxem, RLS və sərtləşdirmə miqrasiyası (20261123000001..000007)
+│   ├── migrations/            # 8 ardıcıl PostgreSQL sxem, RLS, sərtləşdirmə və rəsmi statistika miqrasiyası (20261123000001..000008)
 │   ├── seeds/                 # İdempotent Python Modul 1–2 tədris məzmunu (01_python_intro_modules.sql)
 │   └── bootstrap/             # İlk admin hesabının aktivləşdirilməsi (promote_first_admin.sql)
 ├── scripts/                   # security-check.mjs, check-env.mjs, verify-staging.mjs, dev-sandbox.mjs

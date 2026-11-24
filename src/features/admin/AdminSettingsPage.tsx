@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { MessageCircle, Save } from 'lucide-react';
-import type { AdminPlatformSettings } from '@shared/types/domain';
+import { Building2, Globe, Mail, MessageCircle, Save, ShieldCheck } from 'lucide-react';
+import type { AdminPlatformSettings, EmailProviderMode } from '@shared/types/domain';
 import {
   Alert,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -17,23 +18,58 @@ import { usePlatformSettings } from '@/app/SettingsContext';
 import { apiRequest, ApiError } from '@/lib/apiClient';
 import { buildWhatsAppContactUrl } from '@/lib/whatsapp';
 
+function formatEmailProviderStatus(mode: EmailProviderMode): {
+  badge: string;
+  variant: 'success' | 'amber' | 'neutral';
+  description: string;
+} {
+  if (mode === 'custom_smtp') {
+    return {
+      badge: 'Aktiv (Xüsusi SMTP / Transactional Provayder)',
+      variant: 'success',
+      description:
+        'Server mühit dəyişənlərində xüsusi e-poçt provayderi konfiqurasiya olunub. Göndərən adı və rəsmi əlaqə ünvanı aktivdir.',
+    };
+  }
+  if (mode === 'supabase_auth_default') {
+    return {
+      badge: 'Supabase Auth Standart E-poçt (Xüsusi SMTP qoşulmayıb)',
+      variant: 'amber',
+      description:
+        'Supabase Auth bağlıdır, lakin yüksək həcmli istehsal göndərişi üçün Supabase Dashboard -> Authentication -> SMTP Settings bölməsində rəsmi SMTP provayderi konfiqurasiya edilməlidir.',
+    };
+  }
+  return {
+    badge: 'Konfiqurasiya olunmayıb (Lokal Sandbox Rejimi)',
+    variant: 'neutral',
+    description:
+      'Hazırda real e-poçt provayderi qoşulmayıb və heç bir real e-poçt göndərilmir. Canlı göndəriş yalnız Supabase Auth və SMTP açarları konfiqurasiya edildikdən sonra aktivləşir.',
+  };
+}
+
 export function AdminSettingsPage() {
   const { refreshSettings } = usePlatformSettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [emailProviderMode, setEmailProviderMode] = useState<EmailProviderMode>(
+    'local_sandbox_unconfigured',
+  );
 
   const [form, setForm] = useState({
-    academy_name: 'Kodera',
-    academy_tagline: '',
-    logo_storage_path: null as string | null,
-    contact_email: '',
-    whatsapp_phone: '',
-    whatsapp_button_enabled: false,
+    academy_name: 'Kodera Academy',
+    academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
+    logo_storage_path: '',
+    website_domain: '',
+    contact_email: 'muhammed.ehmedov94@gmail.com',
+    email_sender_name: 'Kodera Academy',
+    whatsapp_phone: '994702045610',
+    whatsapp_button_enabled: true,
     whatsapp_button_label: 'WhatsApp ilə administratora yaz',
-    whatsapp_message_template: '',
-    alternative_contact_text: '',
+    whatsapp_message_template:
+      'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
+    alternative_contact_text: 'Bizimlə əlaqə saxlamaq üçün rəsmi email ünvanımıza yaza bilərsiniz.',
     registration_enabled: true,
     default_public_modules_count: 2,
   });
@@ -45,8 +81,10 @@ export function AdminSettingsPage() {
         setForm({
           academy_name: data.academy_name,
           academy_tagline: data.academy_tagline,
-          logo_storage_path: data.logo_storage_path ?? null,
-          contact_email: data.contact_email ?? '',
+          logo_storage_path: data.logo_storage_path ?? '',
+          website_domain: data.website_domain ?? '',
+          contact_email: data.contact_email ?? 'muhammed.ehmedov94@gmail.com',
+          email_sender_name: data.email_sender_name || 'Kodera Academy',
           whatsapp_phone: data.raw_whatsapp_phone ?? '',
           whatsapp_button_enabled: data.raw_whatsapp_button_enabled,
           whatsapp_button_label: data.whatsapp_button_label,
@@ -55,6 +93,7 @@ export function AdminSettingsPage() {
           registration_enabled: data.registration_enabled,
           default_public_modules_count: data.default_public_modules_count,
         });
+        setEmailProviderMode(data.email_provider_mode ?? 'local_sandbox_unconfigured');
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
@@ -72,24 +111,27 @@ export function AdminSettingsPage() {
     setError(null);
     setFeedback(null);
     try {
-      await apiRequest<AdminPlatformSettings>('/api/admin/settings', {
+      const updated = await apiRequest<AdminPlatformSettings>('/api/admin/settings', {
         method: 'PUT',
         body: {
           academy_name: form.academy_name,
           academy_tagline: form.academy_tagline,
-          logo_storage_path: form.logo_storage_path || null,
-          contact_email: form.contact_email || null,
-          whatsapp_phone: form.whatsapp_phone || null,
+          logo_storage_path: form.logo_storage_path.trim() || null,
+          website_domain: form.website_domain.trim() || null,
+          contact_email: form.contact_email.trim() || null,
+          email_sender_name: form.email_sender_name.trim() || 'Kodera Academy',
+          whatsapp_phone: form.whatsapp_phone.trim() || null,
           whatsapp_button_enabled: form.whatsapp_button_enabled,
           whatsapp_button_label: form.whatsapp_button_label,
           whatsapp_message_template: form.whatsapp_message_template,
-          alternative_contact_text: form.alternative_contact_text || null,
+          alternative_contact_text: form.alternative_contact_text.trim() || null,
           registration_enabled: form.registration_enabled,
           default_public_modules_count: Number(form.default_public_modules_count),
         },
       });
+      setEmailProviderMode(updated.email_provider_mode ?? emailProviderMode);
       await refreshSettings();
-      setFeedback('Platforma və WhatsApp tənzimləmələri yadda saxlanıldı.');
+      setFeedback('Platforma, WhatsApp və e-poçt tənzimləmələri yadda saxlanıldı.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Tənzimləmələr saxlanılmadı.');
     } finally {
@@ -107,21 +149,23 @@ export function AdminSettingsPage() {
       whatsapp_message_template: form.whatsapp_message_template,
     },
     {
-      fullName: 'Aysel Məmmədova',
-      email: 'aysel@example.com',
+      fullName: 'Tələbə Adı',
+      email: 'telebe@gmail.com',
       referenceCode: 'KDR-2026-AB34CD',
     },
   );
+
+  const emailStatus = formatEmailProviderStatus(emailProviderMode);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-extrabold text-[#18181B]">
-          Platforma və WhatsApp Tənzimləmələri
+          Platforma, WhatsApp və E-poçt Tənzimləmələri
         </h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Akademiya məlumatlarını, qeydiyyat açarını və WhatsApp əlaqə düyməsini tək mərkəzdən idarə
-          edin.
+          Kodera Academy rəsmi məlumatlarını, gələcək domen konfiqurasiyasını, WhatsApp əlaqə
+          düyməsini və e-poçt göndərən parametrlərini idarə edin.
         </p>
       </div>
 
@@ -129,9 +173,17 @@ export function AdminSettingsPage() {
       {error && <Alert variant="error">{error}</Alert>}
 
       <form onSubmit={handleSave} className="space-y-6">
+        {/* 1. ACADEMY INFORMATION */}
         <Card>
           <CardHeader>
-            <CardTitle as="h2">Akademiya və Qeydiyyat Ayarları</CardTitle>
+            <CardTitle as="h2" className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-[#4338CA]" />
+              1. Akademiya Məlumatları
+            </CardTitle>
+            <CardDescription>
+              Akademiyanın rəsmi adı, əlaqə e-poçtu, gələcək fərdi domeni, loqo yolu və qəbul
+              parametrləri.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -144,16 +196,36 @@ export function AdminSettingsPage() {
               <Input
                 label="Rəsmi əlaqə emaili"
                 type="email"
+                required
                 value={form.contact_email}
                 onChange={(e) => setForm((p) => ({ ...p, contact_email: e.target.value }))}
               />
             </div>
+
             <Input
               label="Sloqan / Qısa təsvir"
               required
               value={form.academy_tagline}
               onChange={(e) => setForm((p) => ({ ...p, academy_tagline: e.target.value }))}
             />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Gələcək fərdi vebsayt domeni (istəyə bağlı)"
+                placeholder="Hələ alınmayıb (Staging-də Vercel Preview URL istifadə olunur)"
+                hint="Fərdi domen alındıqda https:// ilə daxil edin. Boş buraxıldıqda cari APP_URL / Vercel Preview URL istifadə olunur."
+                value={form.website_domain}
+                onChange={(e) => setForm((p) => ({ ...p, website_domain: e.target.value }))}
+              />
+              <Input
+                label="Loqo saxlama yolu (Supabase Storage / URL)"
+                placeholder="public-media/logo.svg (istəyə bağlı)"
+                hint="Boş buraxıldıqda standart Kodera brend nişanı göstərilir."
+                value={form.logo_storage_path}
+                onChange={(e) => setForm((p) => ({ ...p, logo_storage_path: e.target.value }))}
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 label="Standart pulsuz giriş modul sayı"
@@ -181,15 +253,17 @@ export function AdminSettingsPage() {
           </CardContent>
         </Card>
 
+        {/* 2. WHATSAPP CONFIGURATION */}
         <Card>
           <CardHeader>
             <CardTitle as="h2" className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-emerald-600" />
-              WhatsApp Administrator Əlaqə Düyməsi
+              2. WhatsApp Əlaqə İnteqrasiyası
             </CardTitle>
             <CardDescription>
-              Nömrə boş buraxılsa və ya düymə söndürülsə, WhatsApp düyməsi gizlədilir və telefon
-              nömrəsi ictimai API cavablarında göstərilmir.
+              Tələbə müraciət etdikdən sonra WhatsApp üzərindən administratora əvvəlcədən doldurulmuş
+              mesajla yaza bilər. Mesaj avtomatik göndərilmir — tələbə WhatsApp-da Göndər düyməsini
+              özü sıxır.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -208,8 +282,8 @@ export function AdminSettingsPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 label="WhatsApp nömrəsi (beynəlxalq rəqəmlərlə)"
-                placeholder="994501234567"
-                hint="Yalnız ölkə kodu + nömrə (boşluqsuz və '+' olmadan)."
+                placeholder="994702045610"
+                hint="Yalnız ölkə kodu + nömrə (boşluqsuz və '+' olmadan, məs.: 994702045610)."
                 value={form.whatsapp_phone}
                 onChange={(e) => setForm((p) => ({ ...p, whatsapp_phone: e.target.value }))}
               />
@@ -224,7 +298,7 @@ export function AdminSettingsPage() {
             <Textarea
               label="Hazır mesaj şablonu (Azərbaycan dilində)"
               rows={3}
-              hint="İstifadə oluna bilən dəyişənlər: {{academy_name}}, {{full_name}}, {{email}}, {{reference_code}}"
+              hint="Dəstəklənən dinamik dəyişənlər: {{full_name}}, {{email}}, {{reference_code}}, {{academy_name}}"
               value={form.whatsapp_message_template}
               onChange={(e) =>
                 setForm((p) => ({ ...p, whatsapp_message_template: e.target.value }))
@@ -241,16 +315,75 @@ export function AdminSettingsPage() {
             {form.whatsapp_button_enabled && !waPreview && (
               <Alert variant="warning" title="WhatsApp düyməsi hələ göstərilməyəcək">
                 Düymənin ictimai tərəfdə görünməsi üçün düzgün beynəlxalq nömrə (məs.,{' '}
-                <code>994501234567</code>) daxil edilməlidir.
+                <code>994702045610</code>) daxil edilməlidir.
               </Alert>
             )}
 
             {waPreview && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-950">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-950 space-y-1.5">
                 <p className="font-semibold">Canlı mesaj önizləməsi:</p>
-                <p className="mt-1 leading-relaxed">{waPreview.message}</p>
+                <p className="leading-relaxed">{waPreview.message}</p>
+                <p className="font-mono text-[11px] text-emerald-800 break-all">
+                  URL: {waPreview.url}
+                </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* 3. EMAIL CONFIGURATION */}
+        <Card>
+          <CardHeader>
+            <CardTitle as="h2" className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-[#4338CA]" />
+              3. E-poçt və Göndərən Tənzimləmələri
+            </CardTitle>
+            <CardDescription>
+              Rəsmi əlaqə ünvanı, göndərən adı (Sender Display Name) və server e-poçt provayderinin
+              hazırkı vəziyyəti.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Rəsmi e-poçt ünvanı (mailto: və əlaqə bölmələri)"
+                type="email"
+                required
+                value={form.contact_email}
+                onChange={(e) => setForm((p) => ({ ...p, contact_email: e.target.value }))}
+              />
+              <Input
+                label="E-poçt göndərən adı (Sender Display Name)"
+                required
+                value={form.email_sender_name}
+                onChange={(e) => setForm((p) => ({ ...p, email_sender_name: e.target.value }))}
+              />
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 bg-[#FAFAF9] p-4 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-zinc-500 uppercase">
+                  E-poçt Provayderinin Konfiqurasiya Statusu
+                </span>
+                <Badge variant={emailStatus.variant} data-testid="email-provider-status-badge">
+                  {emailStatus.badge}
+                </Badge>
+              </div>
+              <p className="text-xs leading-relaxed text-zinc-600">{emailStatus.description}</p>
+              <div className="flex items-center gap-2 pt-1 text-xs text-zinc-500">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>
+                  Təhlükəsizlik qaydası: SMTP şifrələri və API açarları yalnız server mühit
+                  dəyişənlərində saxlanılır və heç vaxt brauzerə göndərilmir.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-zinc-500">
+                <Globe className="h-4 w-4 shrink-0 text-[#4338CA]" />
+                <span>
+                  Cari domen: <strong>{form.website_domain || 'Hələ fərdi domen alınmayıb (Vercel Preview / APP_URL)'}</strong>
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

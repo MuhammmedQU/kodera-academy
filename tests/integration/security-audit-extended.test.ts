@@ -202,7 +202,7 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
     }
   });
 
-  it('verifies all 7 sequential SQL migrations, RLS policies, and audit hardening rules exist', () => {
+  it('verifies all 8 sequential SQL migrations, RLS policies, and audit hardening rules exist', () => {
     const migDir = path.resolve(process.cwd(), 'supabase/migrations');
     const files = fs.readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
     expect(files).toEqual([
@@ -213,10 +213,20 @@ describe('Phase 10 & Independent Audit — Extended Security & Static SQL RLS Ve
       '20261123000005_settings_audit_ratelimit.sql',
       '20261123000006_security_functions_rls_policies.sql',
       '20261123000007_audit_security_hardening_and_indexes.sql',
+      '20261123000008_official_academy_contact_and_admin_stats.sql',
     ]);
     for (const file of files) {
       expect(file).toMatch(/^\d{14}_[a-z0-9_]+\.sql$/);
     }
+
+    const mig0008 = fs.readFileSync(
+      path.join(migDir, '20261123000008_official_academy_contact_and_admin_stats.sql'),
+      'utf8',
+    );
+    expect(mig0008).toContain('994702045610');
+    expect(mig0008).toContain('muhammed.ehmedov94@gmail.com');
+    expect(mig0008).toContain('Kodera Academy');
+    expect(mig0008).toContain('get_admin_dashboard_stats');
 
     const rlsSql = fs.readFileSync(
       path.join(migDir, '20261123000006_security_functions_rls_policies.sql'),

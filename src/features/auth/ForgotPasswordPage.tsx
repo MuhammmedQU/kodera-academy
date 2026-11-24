@@ -81,7 +81,7 @@ export function ForgotPasswordPage() {
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="adiniz@example.com"
+                placeholder="adiniz@gmail.com"
                 error={errors.email?.message}
                 {...register('email')}
               />

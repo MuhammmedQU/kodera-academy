@@ -19,6 +19,7 @@
 | 11 | Deployment Hazırlığı | Tamamlandı | [11-phase-11-deployment-prep-report.md](11-phase-11-deployment-prep-report.md), [11-deployment-guide-and-checklist.md](11-deployment-guide-and-checklist.md) |
 | **Audit** | **Müstəqil Yekun Audit & İstehsal Hazırlığı** | **Tamamlandı (Staging Hazır)** | [FINAL_AUDIT_REPORT.md](FINAL_AUDIT_REPORT.md), [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md), [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md) |
 | **Hazırlıq** | **GitHub & İlk Xarici Quraşdırma Öncəsi Tam Hazırlıq** | **Tamamlandı (100% Lokal Hazır)** | [PRE_GITHUB_FINAL_CHECKLIST.md](PRE_GITHUB_FINAL_CHECKLIST.md), [STAGING_DEPLOYMENT_CHECKLIST.md](STAGING_DEPLOYMENT_CHECKLIST.md) |
+| **Real Data** | **Rəsmi Əlaqə, 12 Real Admin Statistikası və Demo Ayrımı** | **Tamamlandı** | [REAL_DATA_IMPLEMENTATION_REPORT.md](REAL_DATA_IMPLEMENTATION_REPORT.md), [ACADEMY_CONTACT_CONFIGURATION.md](ACADEMY_CONTACT_CONFIGURATION.md), [ADMIN_DASHBOARD_VERIFICATION.md](ADMIN_DASHBOARD_VERIFICATION.md) |
 
 ## Aktiv Mühit Bloklayıcıları (Xarici Resurslar)
 - Real `kodera-dev` və `kodera-prod` Supabase layihə açarları hələ `.env.local`-a əlavə edilməyib (inkişaf lokal təhlükəsiz sandbox + avtomatlaşdırılmış testlərlə davam edir; canlı Supabase RLS yoxlaması açarlar əlavə olunduqda icra ediləcək).

@@ -34,7 +34,13 @@ export function PrivacyPolicyPage() {
           </p>
           <p>
             <strong>5. Əlaqə:</strong> Məlumatlarınızla bağlı suallar üçün rəsmi email:{' '}
-            <strong>{settings.contact_email || 'info@kodera.academy'}</strong>.
+            <a
+              href={`mailto:${settings.contact_email || 'muhammed.ehmedov94@gmail.com'}`}
+              className="font-semibold text-[#4338CA] hover:underline"
+            >
+              {settings.contact_email || 'muhammed.ehmedov94@gmail.com'}
+            </a>
+            .
           </p>
         </CardContent>
       </Card>

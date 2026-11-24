@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
                                  CHECK (char_length(btrim(academy_tagline)) BETWEEN 2 AND 240),
     logo_storage_path            text NULL CHECK (logo_storage_path IS NULL OR char_length(logo_storage_path) <= 500),
     contact_email                text NULL CHECK (contact_email IS NULL OR position('@' IN contact_email) > 1),
-    -- E.164 digits only (without '+' or spaces), e.g. '994501234567' for https://wa.me/994501234567
+    -- E.164 digits only (without '+' or spaces), e.g. '994702045610' for https://wa.me/994702045610
     whatsapp_phone               text NULL CHECK (whatsapp_phone IS NULL OR whatsapp_phone ~ '^[1-9][0-9]{7,14}$'),
     whatsapp_button_enabled      boolean NOT NULL DEFAULT false,
     whatsapp_button_label        text NOT NULL DEFAULT 'WhatsApp ilə administratora yaz'

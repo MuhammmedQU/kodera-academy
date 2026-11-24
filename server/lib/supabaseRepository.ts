@@ -308,11 +308,15 @@ export class SupabaseRepository implements KoderaRepository {
   async getPublicSettings(): Promise<PublicPlatformSettings> {
     const { data, error } = await this.admin.rpc('get_public_platform_settings');
     assertNoDbError(error, 'Platforma tənzimləmələri oxunmadı.');
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = (Array.isArray(data) ? data[0] : data) as PublicPlatformSettings | undefined;
     if (!row) {
       throw new HttpError(500, 'SETTINGS_MISSING', 'Platforma tənzimləmələri tapılmadı.');
     }
-    return row as PublicPlatformSettings;
+    return {
+      ...row,
+      email_sender_name: row.email_sender_name ?? 'Kodera Academy',
+      website_domain: row.website_domain ?? null,
+    };
   }
 
   private async enrichCoursesWithCounts(
@@ -1032,46 +1036,118 @@ export class SupabaseRepository implements KoderaRepository {
 
   // --- Admin ---
   async getAdminStats(): Promise<AdminDashboardStats> {
-    const [pendingApps, studentRoles, courses, lessons, activeEnrollments, logs] =
-      await Promise.all([
-        this.admin.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        this.admin
-          .from('user_roles')
-          .select('user_id, profiles!user_roles_user_id_fkey(account_status)')
-          .eq('role', 'student')
-          .is('revoked_at', null),
-        this.admin.from('courses').select('id, is_published'),
-        this.admin.from('lessons').select('id', { count: 'exact', head: true }),
-        this.admin.from('enrollments').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        this.listAuditLogs(10),
-      ]);
+    const [rpcRes, logs] = await Promise.all([
+      this.admin.rpc('get_admin_dashboard_stats'),
+      this.listAuditLogs(10),
+    ]);
 
-    assertNoDbError(pendingApps.error, 'Statistika yüklənmədi.');
-    assertNoDbError(studentRoles.error, 'Tələbə statistikası yüklənmədi.');
-    assertNoDbError(courses.error, 'Kurs statistikası yüklənmədi.');
-    assertNoDbError(lessons.error, 'Dərs statistikası yüklənmədi.');
-    assertNoDbError(activeEnrollments.error, 'Təyinat statistikası yüklənmədi.');
-
-    const studentProfiles = (studentRoles.data ?? []) as Array<{
-      profiles: { account_status: string } | Array<{ account_status: string }> | null;
-    }>;
-    let activeStudentsCount = 0;
-    let suspendedStudentsCount = 0;
-    for (const row of studentProfiles) {
-      const st = unwrap(row.profiles)?.account_status;
-      if (st === 'active') activeStudentsCount += 1;
-      else if (st === 'suspended') suspendedStudentsCount += 1;
+    if (!rpcRes.error && rpcRes.data && typeof rpcRes.data === 'object') {
+      const s = rpcRes.data as Partial<AdminDashboardStats>;
+      const suspended = Number(s.suspended_accounts ?? s.suspended_students ?? 0);
+      return {
+        total_registered_users: Number(s.total_registered_users ?? 0),
+        pending_applications: Number(s.pending_applications ?? 0),
+        approved_applications: Number(s.approved_applications ?? 0),
+        rejected_applications: Number(s.rejected_applications ?? 0),
+        active_students: Number(s.active_students ?? 0),
+        suspended_accounts: suspended,
+        suspended_students: suspended,
+        active_enrollments: Number(s.active_enrollments ?? 0),
+        published_courses: Number(s.published_courses ?? 0),
+        total_courses: Number(s.total_courses ?? 0),
+        total_modules: Number(s.total_modules ?? 0),
+        published_lessons: Number(s.published_lessons ?? 0),
+        total_lessons: Number(s.total_lessons ?? 0),
+        completed_lessons: Number(s.completed_lessons ?? 0),
+        recent_audit_logs: logs,
+      };
     }
 
-    const courseList = (courses.data ?? []) as Array<{ id: string; is_published: boolean }>;
+    // Fallback direct parallel table queries if Migration 0008 RPC is not yet installed
+    const [
+      appsRes,
+      rolesRes,
+      coursesRes,
+      modulesRes,
+      lessonsRes,
+      activeEnrollmentsRes,
+      completedLessonsRes,
+    ] = await Promise.all([
+      this.admin.from('applications').select('user_id, status'),
+      this.admin
+        .from('user_roles')
+        .select('user_id, role, profiles!user_roles_user_id_fkey(account_status)')
+        .is('revoked_at', null),
+      this.admin.from('courses').select('id, status, is_published'),
+      this.admin.from('modules').select('id', { count: 'exact', head: true }).neq('status', 'archived'),
+      this.admin.from('lessons').select('id, status, is_published'),
+      this.admin.from('enrollments').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      this.admin
+        .from('lesson_progress')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'completed'),
+    ]);
+
+    assertNoDbError(appsRes.error, 'Statistika yüklənmədi.');
+    assertNoDbError(rolesRes.error, 'Tələbə statistikası yüklənmədi.');
+    assertNoDbError(coursesRes.error, 'Kurs statistikası yüklənmədi.');
+    assertNoDbError(modulesRes.error, 'Modul statistikası yüklənmədi.');
+    assertNoDbError(lessonsRes.error, 'Dərs statistikası yüklənmədi.');
+    assertNoDbError(activeEnrollmentsRes.error, 'Təyinat statistikası yüklənmədi.');
+    assertNoDbError(completedLessonsRes.error, 'Tamamlanmış dərs statistikası yüklənmədi.');
+
+    const roleRows = (rolesRes.data ?? []) as Array<{
+      user_id: string;
+      role: string;
+      profiles: { account_status: string } | Array<{ account_status: string }> | null;
+    }>;
+    const adminIds = new Set(roleRows.filter((r) => r.role === 'admin').map((r) => r.user_id));
+    const studentMap = new Map<string, string>();
+    for (const r of roleRows) {
+      if (r.role === 'student' && !adminIds.has(r.user_id)) {
+        const st = unwrap(r.profiles)?.account_status ?? 'pending';
+        studentMap.set(r.user_id, st);
+      }
+    }
+
+    let totalRegisteredUsers = 0;
+    let activeStudentsCount = 0;
+    let suspendedCount = 0;
+    for (const st of studentMap.values()) {
+      if (st !== 'archived') totalRegisteredUsers += 1;
+      if (st === 'active') activeStudentsCount += 1;
+      else if (st === 'suspended') suspendedCount += 1;
+    }
+
+    const appRows = ((appsRes.data ?? []) as Array<{ user_id: string; status: string }>).filter(
+      (a) => !adminIds.has(a.user_id),
+    );
+    const courseList = (coursesRes.data ?? []) as Array<{
+      id: string;
+      status: string;
+      is_published: boolean;
+    }>;
+    const lessonList = (lessonsRes.data ?? []) as Array<{
+      id: string;
+      status: string;
+      is_published: boolean;
+    }>;
+
     return {
-      pending_applications: pendingApps.count ?? 0,
+      total_registered_users: totalRegisteredUsers,
+      pending_applications: appRows.filter((a) => a.status === 'pending').length,
+      approved_applications: appRows.filter((a) => a.status === 'approved').length,
+      rejected_applications: appRows.filter((a) => a.status === 'rejected').length,
       active_students: activeStudentsCount,
-      suspended_students: suspendedStudentsCount,
+      suspended_accounts: suspendedCount,
+      suspended_students: suspendedCount,
+      active_enrollments: activeEnrollmentsRes.count ?? 0,
       published_courses: courseList.filter((c) => c.is_published).length,
-      total_courses: courseList.length,
-      total_lessons: lessons.count ?? 0,
-      active_enrollments: activeEnrollments.count ?? 0,
+      total_courses: courseList.filter((c) => c.status !== 'archived').length,
+      total_modules: modulesRes.count ?? 0,
+      published_lessons: lessonList.filter((l) => l.is_published).length,
+      total_lessons: lessonList.filter((l) => l.status !== 'archived').length,
+      completed_lessons: completedLessonsRes.count ?? 0,
       recent_audit_logs: logs,
     };
   }
@@ -1776,17 +1852,28 @@ export class SupabaseRepository implements KoderaRepository {
     assertNoDbError(error, 'Tənzimləmələr oxunmadı.');
     const { id: _omitId, ...row } = data as PublicPlatformSettings & {
       id: boolean;
+      email_sender_name?: string;
+      website_domain?: string | null;
       updated_by: string | null;
       updated_at: string;
     };
     void _omitId;
     const enabled = row.whatsapp_button_enabled && Boolean(row.whatsapp_phone);
+    const hasCustomSmtp =
+      Boolean(process.env.SMTP_HOST?.trim() && process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim()) ||
+      Boolean(process.env.RESEND_API_KEY?.trim()) ||
+      Boolean(process.env.POSTMARK_SERVER_TOKEN?.trim());
+
     return {
       ...row,
+      email_sender_name: row.email_sender_name ?? 'Kodera Academy',
+      website_domain: row.website_domain ?? null,
       whatsapp_button_enabled: enabled,
       whatsapp_phone: enabled ? row.whatsapp_phone : null,
       raw_whatsapp_button_enabled: row.whatsapp_button_enabled,
       raw_whatsapp_phone: row.whatsapp_phone,
+      email_provider_configured: hasCustomSmtp,
+      email_provider_mode: hasCustomSmtp ? 'custom_smtp' : 'supabase_auth_default',
     };
   }
 

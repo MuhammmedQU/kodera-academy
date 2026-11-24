@@ -68,11 +68,18 @@ export interface AuthSessionUser {
   application: Application | null;
 }
 
+export type EmailProviderMode =
+  | 'custom_smtp'
+  | 'supabase_auth_default'
+  | 'local_sandbox_unconfigured';
+
 export interface PublicPlatformSettings {
   academy_name: string;
   academy_tagline: string;
   logo_storage_path: string | null;
   contact_email: string | null;
+  email_sender_name?: string;
+  website_domain?: string | null;
   whatsapp_button_enabled: boolean;
   whatsapp_phone: string | null;
   whatsapp_button_label: string;
@@ -83,8 +90,12 @@ export interface PublicPlatformSettings {
 }
 
 export interface AdminPlatformSettings extends PublicPlatformSettings {
+  email_sender_name: string;
+  website_domain: string | null;
   raw_whatsapp_button_enabled: boolean;
   raw_whatsapp_phone: string | null;
+  email_provider_configured: boolean;
+  email_provider_mode: EmailProviderMode;
   updated_by: string | null;
   updated_at: string;
 }
@@ -359,13 +370,20 @@ export interface AuditLogEntry {
 }
 
 export interface AdminDashboardStats {
+  total_registered_users: number;
   pending_applications: number;
+  approved_applications: number;
+  rejected_applications: number;
   active_students: number;
+  suspended_accounts: number;
   suspended_students: number;
+  active_enrollments: number;
   published_courses: number;
   total_courses: number;
+  total_modules: number;
+  published_lessons: number;
   total_lessons: number;
-  active_enrollments: number;
+  completed_lessons: number;
   recent_audit_logs: AuditLogEntry[];
 }
 

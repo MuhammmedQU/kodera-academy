@@ -167,23 +167,41 @@ describe('Phase 4 — Auth, Registration, RBAC & WhatsApp Security Integration T
     const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
 
     const before = await callApi({ url: '/api/public/settings' });
-    expect((before.body as { data: { whatsapp_button_enabled: boolean; whatsapp_phone: string } }).data.whatsapp_button_enabled).toBe(true);
-    expect((before.body as { data: { whatsapp_phone: string } }).data.whatsapp_phone).toBe('994501234567');
+    const beforeData = (
+      before.body as {
+        data: {
+          academy_name: string;
+          contact_email: string;
+          email_sender_name: string;
+          website_domain: string | null;
+          whatsapp_button_enabled: boolean;
+          whatsapp_phone: string;
+        };
+      }
+    ).data;
+    expect(beforeData.academy_name).toBe('Kodera Academy');
+    expect(beforeData.contact_email).toBe('muhammed.ehmedov94@gmail.com');
+    expect(beforeData.email_sender_name).toBe('Kodera Academy');
+    expect(beforeData.website_domain).toBeNull();
+    expect(beforeData.whatsapp_button_enabled).toBe(true);
+    expect(beforeData.whatsapp_phone).toBe('994702045610');
 
     const disableRes = await callApi({
       method: 'PUT',
       url: '/api/admin/settings',
       token: adminToken,
       body: {
-        academy_name: 'Kodera',
+        academy_name: 'Kodera Academy',
         academy_tagline: 'Proqramlaşdırmanı sadə, aydın və praktik öyrən',
         logo_storage_path: null,
-        contact_email: 'info@kodera.academy',
-        whatsapp_phone: '994501234567',
+        contact_email: 'muhammed.ehmedov94@gmail.com',
+        email_sender_name: 'Kodera Academy',
+        website_domain: null,
+        whatsapp_phone: '994702045610',
         whatsapp_button_enabled: false,
         whatsapp_button_label: 'WhatsApp ilə administratora yaz',
         whatsapp_message_template:
-          'Salam! {{academy_name}} müraciəti: {{full_name}}, {{email}}, {{reference_code}}',
+          'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
         alternative_contact_text: 'Email vasitəsilə əlaqə saxlayın.',
         registration_enabled: true,
         default_public_modules_count: 2,

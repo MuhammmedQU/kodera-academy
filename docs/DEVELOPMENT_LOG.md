@@ -64,3 +64,10 @@
 - `.env.staging.example`, `supabase/bootstrap/promote_first_admin.sql`, `scripts/check-env.mjs` (`npm run env:check`), `scripts/verify-staging.mjs` (`npm run staging:verify`), `docs/STAGING_DEPLOYMENT_CHECKLIST.md` və `docs/PRE_GITHUB_FINAL_CHECKLIST.md` yaradıldı.
 - `scripts/security-check.mjs` həm `src/`, həm `dist/`, həm də `.env.example` / `.env.staging.example` şablonlarını yoxlayacaq şəkildə gücləndirildi.
 - `env:check`, `typecheck`, `lint`, `vitest` (38/38), `build` (0 xəbərdarlıq), `security:check` (0 pozuntu), `npm audit` (0 boşluq) və `playwright` Chrome E2E (4/4, 72 viewport) yenidən 100% uğurla keçdi.
+
+## 2026-11-24 — Rəsmi Akademiya Əlaqə Məlumatları, Real Admin Statistikaları və Demo Ayrımı
+- Rəsmi məlumatlar tətbiq edildi: `Kodera Academy`, WhatsApp `994702045610`, rəsmi e-poçt `muhammed.ehmedov94@gmail.com`, göndərən adı `Kodera Academy`, fərdi domen `NULL` (hələ alınmayıb, konfiqurasiya oluna bilən).
+- Miqrasiya `20261123000008_official_academy_contact_and_admin_stats.sql` əlavə edildi (`email_sender_name`, `website_domain`, yenilənmiş `get_public_platform_settings()` və 12 göstəricili `get_admin_dashboard_stats()` RPC).
+- `LocalSandboxRepository`-də `@kodera.local` demo test hesabları `getAdminStats()`, `listApplications()`, `listStudents()` və `listEnrollments()` nəticələrindən tam təcrid edildi (başlanğıcda bütün istifadəçi/müraciət/təyinat sayları `0` göstərir); Lokal Sandbox rejimi üçün aydın bildiriş zolağı əlavə olundu.
+- `/admin` (`AdminOverviewPage.tsx`) 12 real göstərici ilə, `/admin/settings` (`AdminSettingsPage.tsx`) isə 3 aydın bölmə (Akademiya, WhatsApp, E-poçt + provayder statusu) ilə yeniləndi.
+- `docs/REAL_DATA_IMPLEMENTATION_REPORT.md`, `docs/ACADEMY_CONTACT_CONFIGURATION.md` və `docs/ADMIN_DASHBOARD_VERIFICATION.md` yaradıldı; bütün 38/38 Vitest + 4/4 Chrome Playwright E2E + `build` + `security:check` keçdi.

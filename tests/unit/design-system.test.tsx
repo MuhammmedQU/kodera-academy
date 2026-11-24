@@ -50,42 +50,44 @@ describe('Phase 3 — Kodera Design System & Foundation', () => {
   it('builds official wa.me URL only when enabled and hides when disabled', () => {
     const disabled = buildWhatsAppContactUrl(
       {
-        academy_name: 'Kodera',
+        academy_name: 'Kodera Academy',
         whatsapp_button_enabled: false,
-        whatsapp_phone: '994501234567',
-        whatsapp_message_template: 'Salam {{full_name}} {{reference_code}}',
+        whatsapp_phone: '994702045610',
+        whatsapp_message_template:
+          'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
       },
-      { fullName: 'Aysel Əliyeva', email: 'aysel@example.com', referenceCode: 'KDR-2026-AB34CD' },
+      { fullName: 'Aysel Əliyeva', email: 'aysel@gmail.com', referenceCode: 'KDR-2026-AB34CD' },
     );
     expect(disabled).toBeNull();
 
     const enabled = buildWhatsAppContactUrl(
       {
-        academy_name: 'Kodera',
+        academy_name: 'Kodera Academy',
         whatsapp_button_enabled: true,
-        whatsapp_phone: '994501234567',
+        whatsapp_phone: '994702045610',
         whatsapp_message_template:
-          'Salam! {{academy_name}} müraciətim: {{full_name}}, {{email}}, {{reference_code}}',
+          'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
       },
-      { fullName: 'Aysel Əliyeva', email: 'aysel@example.com', referenceCode: 'KDR-2026-AB34CD' },
+      { fullName: 'Aysel Əliyeva', email: 'aysel@gmail.com', referenceCode: 'KDR-2026-AB34CD' },
     );
     expect(enabled).not.toBeNull();
-    expect(enabled?.url.startsWith('https://wa.me/994501234567?text=')).toBe(true);
-    expect(enabled?.message).toContain('Aysel Əliyeva');
-    expect(enabled?.message).toContain('KDR-2026-AB34CD');
+    expect(enabled?.url.startsWith('https://wa.me/994702045610?text=')).toBe(true);
+    expect(enabled?.message).toBe(
+      'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: Aysel Əliyeva, Email: aysel@gmail.com, Müraciət nömrəsi: KDR-2026-AB34CD. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.',
+    );
   });
 
   it('blocks unsafe javascript: URLs and permits safe https/relative URLs', () => {
-    expect(isSafeUrl('https://kodera.academy')).toBe(true);
+    expect(isSafeUrl('https://vercel.app')).toBe(true);
     expect(isSafeUrl('/courses/python')).toBe(true);
-    expect(isSafeUrl('mailto:info@kodera.academy')).toBe(true);
+    expect(isSafeUrl('mailto:muhammed.ehmedov94@gmail.com')).toBe(true);
     expect(isSafeUrl('javascript:alert(1)')).toBe(false);
-    expect(isSafeUrl('//evil.example.com')).toBe(false);
-    expect(isSafeUrl('/\\evil.example.com')).toBe(false);
+    expect(isSafeUrl('//evil.test')).toBe(false);
+    expect(isSafeUrl('/\\evil.test')).toBe(false);
 
-    expect(isSafeImageUrl('https://cdn.example.com/img.png')).toBe(true);
+    expect(isSafeImageUrl('https://cdn.jsdelivr.net/img.png')).toBe(true);
     expect(isSafeImageUrl('/media/diagram.png')).toBe(true);
-    expect(isSafeImageUrl('mailto:info@kodera.academy')).toBe(false);
+    expect(isSafeImageUrl('mailto:muhammed.ehmedov94@gmail.com')).toBe(false);
     expect(isSafeImageUrl('javascript:alert(1)')).toBe(false);
 
     // tailwind-merge resolves conflicting utility overrides predictably

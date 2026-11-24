@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { AdminDashboardStats } from '@shared/types/domain';
 import { SEED_IDS } from '@server/content/initialSeed';
-import { SANDBOX_USERS } from '@server/dev/localSandboxRepository';
 import { callApi, createTestSandbox, loginAs } from './testHttp';
 
 describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dynamic Public Modules', () => {
@@ -29,20 +29,70 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
     }
   });
 
-  it('separates application approval from course assignment, then enables and revokes course access', async () => {
+  it('starts with 0 fake statistics, separates approval from course assignment, and updates real stats dynamically', async () => {
     const adminToken = await loginAs('admin@kodera.local', 'AdminPass123!');
-    const pendingToken = await loginAs('pending@kodera.local', 'StudentPass123!');
 
-    // 1. Find pending application
+    // 0. Before any real student registers, dashboard statistics MUST show 0 (demo fixtures never contaminate stats!)
+    const initialStatsRes = await callApi({ url: '/api/admin/stats', token: adminToken });
+    expect(initialStatsRes.status).toBe(200);
+    const initialStats = (initialStatsRes.body as { data: AdminDashboardStats }).data;
+    expect(initialStats.total_registered_users).toBe(0);
+    expect(initialStats.pending_applications).toBe(0);
+    expect(initialStats.approved_applications).toBe(0);
+    expect(initialStats.rejected_applications).toBe(0);
+    expect(initialStats.active_students).toBe(0);
+    expect(initialStats.suspended_accounts).toBe(0);
+    expect(initialStats.active_enrollments).toBe(0);
+    expect(initialStats.completed_lessons).toBe(0);
+    expect(initialStats.published_courses).toBe(2);
+    expect(initialStats.total_modules).toBe(4);
+    expect(initialStats.published_lessons).toBe(10);
+    expect(initialStats.recent_audit_logs).toEqual([]);
+
+    // 1. Register a real student applicant
+    const regRes = await callApi({
+      method: 'POST',
+      url: '/api/auth/register',
+      ip: '198.51.100.44',
+      body: {
+        full_name: 'Nərgiz Hüseynova',
+        email: 'nergiz.huseynova@gmail.com',
+        password: 'Password123!',
+        phone: '+994 70 204 56 10',
+        learning_goals: 'Python öyrənmək',
+      },
+    });
+    expect(regRes.status).toBe(201);
+    const regData = (
+      regRes.body as {
+        data: { access_token: string; user: { profile: { id: string } } };
+      }
+    ).data;
+    const applicantToken = regData.access_token;
+    const applicantId = regData.user.profile.id;
+
+    // Dashboard stats now reflect 1 registered user and 1 pending application
+    const afterRegStats = (
+      (await callApi({ url: '/api/admin/stats', token: adminToken })).body as {
+        data: AdminDashboardStats;
+      }
+    ).data;
+    expect(afterRegStats.total_registered_users).toBe(1);
+    expect(afterRegStats.pending_applications).toBe(1);
+    expect(afterRegStats.active_students).toBe(0);
+
+    // Find pending application
     const appsRes = await callApi({
       url: '/api/admin/applications?status=pending',
       token: adminToken,
     });
     expect(appsRes.status).toBe(200);
-    const apps = (appsRes.body as {
-      data: Array<{ application: { id: string; user_id: string } }>;
-    }).data;
-    const pendingApp = apps.find((a) => a.application.user_id === SANDBOX_USERS.PENDING_ID)!;
+    const apps = (
+      appsRes.body as {
+        data: Array<{ application: { id: string; user_id: string } }>;
+      }
+    ).data;
+    const pendingApp = apps.find((a) => a.application.user_id === applicantId)!;
     expect(pendingApp).toBeDefined();
 
     // 2. Approve application with private internal note
@@ -57,9 +107,20 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
     });
     expect(reviewRes.status).toBe(200);
 
+    // Stats update: 0 pending, 1 approved, 1 active student, still 0 active enrollments
+    const afterApproveStats = (
+      (await callApi({ url: '/api/admin/stats', token: adminToken })).body as {
+        data: AdminDashboardStats;
+      }
+    ).data;
+    expect(afterApproveStats.pending_applications).toBe(0);
+    expect(afterApproveStats.approved_applications).toBe(1);
+    expect(afterApproveStats.active_students).toBe(1);
+    expect(afterApproveStats.active_enrollments).toBe(0);
+
     // 3. CRITICAL: Approved student STILL cannot read restricted Python lesson before course assignment!
     const restrictedUrl = '/api/public/courses/python-esaslari/lessons/for-dovru-giris';
-    expect((await callApi({ url: restrictedUrl, token: pendingToken })).status).toBe(403);
+    expect((await callApi({ url: restrictedUrl, token: applicantToken })).status).toBe(403);
 
     // 4. Separate operation: Admin assigns Python course
     const assignRes = await callApi({
@@ -67,7 +128,7 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
       url: '/api/admin/enrollments',
       token: adminToken,
       body: {
-        student_id: SANDBOX_USERS.PENDING_ID,
+        student_id: applicantId,
         course_ids: [SEED_IDS.COURSE_PYTHON],
       },
     });
@@ -75,17 +136,34 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
     const enrollmentId = (assignRes.body as { data: Array<{ id: string }> }).data[0]!.id;
 
     // 5. Now student CAN access Python restricted lesson, but STILL NOT SQL!
-    expect((await callApi({ url: restrictedUrl, token: pendingToken })).status).toBe(200);
+    expect((await callApi({ url: restrictedUrl, token: applicantToken })).status).toBe(200);
     expect(
       (
         await callApi({
           url: '/api/public/courses/sql-verilenler-bazasi/lessons/select-sorgusu',
-          token: pendingToken,
+          token: applicantToken,
         })
       ).status,
     ).toBe(403);
 
-    // 6. Admin revokes Python enrollment -> access immediately cut off
+    // Student completes a lesson -> completed_lessons and active_enrollments both equal 1
+    const progRes = await callApi({
+      method: 'PUT',
+      url: `/api/student/lessons/${SEED_IDS.LES_PY_1_1}/progress`,
+      token: applicantToken,
+      body: { status: 'completed' },
+    });
+    expect(progRes.status).toBe(200);
+
+    const afterEnrollStats = (
+      (await callApi({ url: '/api/admin/stats', token: adminToken })).body as {
+        data: AdminDashboardStats;
+      }
+    ).data;
+    expect(afterEnrollStats.active_enrollments).toBe(1);
+    expect(afterEnrollStats.completed_lessons).toBe(1);
+
+    // 6. Admin revokes Python enrollment -> access immediately cut off & active_enrollments drops to 0
     const revokeRes = await callApi({
       method: 'POST',
       url: `/api/admin/enrollments/${enrollmentId}/revoke`,
@@ -93,7 +171,13 @@ describe('Phase 5 — Admin Dashboard, RBAC, Separate Approval/Enrollment & Dyna
       body: { revoke_reason: 'Test ləğvi' },
     });
     expect(revokeRes.status).toBe(200);
-    expect((await callApi({ url: restrictedUrl, token: pendingToken })).status).toBe(403);
+    expect((await callApi({ url: restrictedUrl, token: applicantToken })).status).toBe(403);
+    const afterRevokeStats = (
+      (await callApi({ url: '/api/admin/stats', token: adminToken })).body as {
+        data: AdminDashboardStats;
+      }
+    ).data;
+    expect(afterRevokeStats.active_enrollments).toBe(0);
 
     // 7. Audit logs recorded all operations and refuse mutation (DELETE/PATCH -> 403)
     const logsRes = await callApi({ url: '/api/admin/audit-logs', token: adminToken });

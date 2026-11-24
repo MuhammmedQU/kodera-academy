@@ -32,10 +32,10 @@ export function buildWhatsAppContactUrl(
 
   const template =
     settings.whatsapp_message_template?.trim() ||
-    'Salam! {{academy_name}} akademiyasında qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.';
+    'Salam! Kodera Academy-də qeydiyyat müraciəti etdim. Ad: {{full_name}}, Email: {{email}}, Müraciət nömrəsi: {{reference_code}}. Müraciətimin nəzərdən keçirilməsini xahiş edirəm.';
 
   const message = template
-    .replaceAll('{{academy_name}}', context.academyName || settings.academy_name || 'Kodera')
+    .replaceAll('{{academy_name}}', context.academyName || settings.academy_name || 'Kodera Academy')
     .replaceAll('{{full_name}}', context.fullName)
     .replaceAll('{{email}}', context.email)
     .replaceAll('{{reference_code}}', context.referenceCode);

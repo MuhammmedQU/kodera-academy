@@ -218,7 +218,7 @@ export function RegisterPage() {
             <Input
               label="Email ünvanı"
               type="email"
-              placeholder="adiniz@example.com"
+              placeholder="adiniz@gmail.com"
               required
               autoComplete="email"
               error={errors.email?.message}

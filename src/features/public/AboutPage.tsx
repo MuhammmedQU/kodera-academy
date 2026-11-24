@@ -68,7 +68,13 @@ export function AboutPage() {
           </h2>
           {settings.contact_email && (
             <p className="mt-1 text-sm text-zinc-600">
-              Rəsmi əlaqə: <strong>{settings.contact_email}</strong>
+              Rəsmi əlaqə:{' '}
+              <a
+                href={`mailto:${settings.contact_email}`}
+                className="font-semibold text-[#4338CA] hover:underline"
+              >
+                {settings.contact_email}
+              </a>
             </p>
           )}
         </div>

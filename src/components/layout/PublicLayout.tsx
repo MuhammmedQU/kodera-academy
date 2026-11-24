@@ -5,6 +5,7 @@ import { BrandLogo, Button, ButtonLink } from '@/components/ui';
 import { useAuth } from '@/app/AuthContext';
 import { usePlatformSettings } from '@/app/SettingsContext';
 import { cn } from '@/lib/cn';
+import { clientEnv } from '@/lib/env';
 
 const navLinks = [
   { to: '/', label: 'Ana səhifə', end: true },
@@ -41,6 +42,14 @@ export function PublicLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FAFAF9] text-[#18181B]">
+      {clientEnv.isLocalSandbox && (
+        <div
+          data-testid="sandbox-mode-banner"
+          className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-950"
+        >
+          Lokal Sandbox Rejimi — Yalnız lokal test mühiti (Canlı Supabase verilənlər bazası və e-poçt xidməti qoşulmayıb)
+        </div>
+      )}
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="focus-visible:rounded-xl">

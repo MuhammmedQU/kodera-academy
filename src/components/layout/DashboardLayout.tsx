@@ -5,6 +5,7 @@ import { Badge, BrandLogo, Button, ButtonLink } from '@/components/ui';
 import { useAuth } from '@/app/AuthContext';
 import { usePlatformSettings } from '@/app/SettingsContext';
 import { cn } from '@/lib/cn';
+import { clientEnv } from '@/lib/env';
 
 export interface SidebarNavItem {
   to: string;
@@ -160,6 +161,14 @@ export function DashboardLayout({
 
       {/* Main Content */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {clientEnv.isLocalSandbox && (
+          <div
+            data-testid="sandbox-mode-banner"
+            className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-950"
+          >
+            Lokal Sandbox Rejimi — Yalnız lokal test mühiti (Canlı Supabase verilənlər bazası qoşulmayıb)
+          </div>
+        )}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-zinc-200/80 bg-white/95 px-4 backdrop-blur-md lg:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <button

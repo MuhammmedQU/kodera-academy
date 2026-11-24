@@ -59,11 +59,16 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await expect(waLink).toBeVisible();
     const href = await waLink.getAttribute('href');
     expect(href).toBeTruthy();
-    expect(href?.startsWith('https://wa.me/994501234567?text=')).toBe(true);
+    expect(href?.startsWith('https://wa.me/994702045610?text=')).toBe(true);
     const decoded = decodeURIComponent(href ?? '');
+    expect(decoded).toContain('Salam! Kodera Academy-də qeydiyyat müraciəti etdim.');
     expect(decoded).toContain(fullName);
     expect(decoded).toContain(uniqueEmail);
     expect(decoded).toContain(refCode);
+
+    // Verify official contact email mailto link in footer
+    const mailtoLink = page.locator('footer a[href="mailto:muhammed.ehmedov94@gmail.com"]');
+    await expect(mailtoLink).toBeVisible();
 
     // 3. PENDING student cannot access /dashboard or /admin
     await page.goto('/dashboard');
@@ -78,6 +83,12 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await page.getByLabel(/Şifrə/i).fill('AdminPass123!');
     await page.getByRole('main').getByRole('button', { name: /Daxil ol/i }).click();
     await expect(page).toHaveURL(/\/admin$/);
+
+    // Verify Admin Dashboard calculates real database-backed counts (1 newly registered pending student, 0 fake active students/enrollments)
+    await expect(page.getByTestId('stat-value-total_registered_users')).toHaveText('1');
+    await expect(page.getByTestId('stat-value-pending_applications')).toHaveText('1');
+    await expect(page.getByTestId('stat-value-active_students')).toHaveText('0');
+    await expect(page.getByTestId('stat-value-active_enrollments')).toHaveText('0');
 
     // 5. Admin approves the student's application with internal note
     await page.getByRole('link', { name: /Müraciətlər/i }).first().click();
@@ -107,6 +118,24 @@ test.describe('Kodera Academy — Full End-to-End User, Admin, Student & Securit
     await courseSelect.selectOption(pyOption!);
     await page.getByRole('button', { name: /Kursu təyin et/i }).click();
     await expect(page.getByText(/Kurs uğurla təyin edildi/i)).toBeVisible();
+
+    // Verify Admin Overview stats updated after approval & enrollment
+    await page.goto('/admin');
+    await expect(page.getByTestId('stat-value-pending_applications')).toHaveText('0');
+    await expect(page.getByTestId('stat-value-approved_applications')).toHaveText('1');
+    await expect(page.getByTestId('stat-value-active_students')).toHaveText('1');
+    await expect(page.getByTestId('stat-value-active_enrollments')).toHaveText('1');
+
+    // Verify Admin Settings 3 sections & official contact persistence
+    await page.goto('/admin/settings');
+    await expect(page.getByRole('heading', { name: /1\. Akademiya Məlumatları/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /2\. WhatsApp Əlaqə İnteqrasiyası/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /3\. E-poçt və Göndərən Tənzimləmələri/i })).toBeVisible();
+    await expect(page.getByTestId('email-provider-status-badge')).toBeVisible();
+    await page.getByRole('button', { name: /Tənzimləmələri yadda saxla/i }).click();
+    await expect(
+      page.getByText(/Platforma, WhatsApp və e-poçt tənzimləmələri yadda saxlanıldı/i),
+    ).toBeVisible();
 
     // 7. Admin verifies Audit Logs recorded the actions
     await page.getByRole('link', { name: /Audit jurnalı/i }).first().click();

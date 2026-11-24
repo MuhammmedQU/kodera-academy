@@ -38,7 +38,7 @@ describe('Phase 6 — 11-Block LessonContentRenderer', () => {
         block_type: 'image',
         sort_order: 3,
         title: null,
-        content: { url: 'https://kodera.academy/img/box.png', alt: 'Qutu diaqramı', caption: 'Şəkil 1' },
+        content: { url: '/media/box.png', alt: 'Qutu diaqramı', caption: 'Şəkil 1' },
         exercise_id: null,
         quiz_id: null,
         is_published: true,

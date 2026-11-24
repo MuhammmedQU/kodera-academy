@@ -17,6 +17,7 @@
      5. `supabase/migrations/20261123000005_settings_audit_ratelimit.sql`
      6. `supabase/migrations/20261123000006_security_functions_rls_policies.sql`
      7. `supabase/migrations/20261123000007_audit_security_hardening_and_indexes.sql`
+     8. `supabase/migrations/20261123000008_official_academy_contact_and_admin_stats.sql`
    - İlk 2 pulsuz Python modulunu yükləyin:
      - `supabase/seeds/01_python_intro_modules.sql`
 2. **Production layihəsi (`kodera-prod`):**

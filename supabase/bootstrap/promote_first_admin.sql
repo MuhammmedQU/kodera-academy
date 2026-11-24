@@ -42,14 +42,9 @@ BEGIN
     VALUES (v_user_id, 'admin', v_user_id)
     ON CONFLICT (user_id, role) WHERE revoked_at IS NULL DO NOTHING;
 
-    -- 3. Mark the initial signup application as approved (if still pending)
-    UPDATE public.applications
-       SET status = 'approved',
-           reviewed_by = v_user_id,
-           reviewed_at = now(),
-           rejection_reason = NULL
-     WHERE user_id = v_user_id
-       AND status = 'pending';
+    -- 3. Remove any student signup application row for the admin account so it never appears in student applications
+    DELETE FROM public.applications
+     WHERE user_id = v_user_id;
 
     -- 4. Record immutable audit entry
     INSERT INTO public.audit_logs (actor_id, actor_role, action, entity_type, entity_id, metadata)
